@@ -19,6 +19,8 @@ int main()
 	/* Use the MAKEWORD(lowbyte, highbyte) macro declared in Windef.h */
 	wVersionRequested = MAKEWORD(2, 2);
 
+	//----------------------
+	// Initialize Winsock
 	err = WSAStartup(wVersionRequested, &wsaData);
 	if (err != ERROR_SUCCESS) // ERROR_SUCCESS = 0L
 	{
@@ -52,27 +54,84 @@ int main()
 
 	/* Add network programming using Winsock here */
 	
-	SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_HOPOPTS);
-
-	if (sock == INVALID_SOCKET)
+	//----------------------
+	// Create a SOCKET for listening for 
+	// incoming connection requests
+	SOCKET listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_HOPOPTS);
+	if (listenSocket == INVALID_SOCKET)
 	{
 		std::cout << "socket function failed with error = " << WSAGetLastError() << "\n";
+		WSACleanup();
+		return 1;
 	}
-	else
-	{
-		std::cout << "socket function succeeded\n";
-	}
+	
+	std::cout << "socket function succeeded\n";
 
 	// IPv4
 
-	SOCKADDR_IN service{ 0 };
+	//----------------------
+	// The sockaddr_in structure specifies the address family,
+	// IP address, and port for the socket that is being bound.
+	SOCKADDR_IN serverService{ 0 };
 	
-	service.sin_family = AF_INET;						// AF_INET : IPv4
-	inet_pton(AF_INET, "127.0.0.1", &service.sin_addr); // IP 127.0.0.1 : MyCom IP
+	serverService.sin_family = AF_INET;						// AF_INET : IPv4
+	inet_pton(AF_INET, "127.0.0.1", &serverService.sin_addr); // IP 127.0.0.1 : MyCom IP
 	// htons : host to network short
-	service.sin_port = htons(7777);						// port : 7777
-	
-	std::cout << "port function succeeded\n";
+	serverService.sin_port = htons(7777);						// port : 7777
+
+	//----------------------
+	// Bind the socket. (SOCKET, SOCKADDR)
+	err = bind(listenSocket, (SOCKADDR*)&serverService, sizeof(serverService));
+	if (err == SOCKET_ERROR)
+	{
+		std::cout << "bind failed with error = " << WSAGetLastError() << "\n";
+		closesocket(listenSocket);
+		WSACleanup();
+		return 1;
+	}
+
+	std::cout << "bind returned success\n";
+
+	//----------------------
+	// Listen for incoming connection requests 
+	// on the created socket
+	err = listen(listenSocket, 1);
+	if (err == SOCKET_ERROR)
+	{
+		std::cout << "listen function failed with error = " << WSAGetLastError() << "\n";
+
+		closesocket(listenSocket);
+		WSACleanup();
+		return 1;
+	}
+
+	while (true)
+	{
+		//----------------------
+		// Create a SOCKET for accepting incoming requests.
+		std::cout << "\nWaiting for client to connect...\n";
+
+		SOCKADDR_IN clientService{ 0 };	// Client Socket Info
+		int addrLen = sizeof(clientService);
+
+		//----------------------
+		// Accept the connection.
+		SOCKET acceptSocket = accept(listenSocket, (SOCKADDR *) &clientService, &addrLen);
+		if (acceptSocket == INVALID_SOCKET)
+		{
+			std::cout << "accept failed with error = " << WSAGetLastError() << "\n";
+
+			closesocket(listenSocket);
+			WSACleanup();
+			return 1;
+		}
+
+		std::cout << "Client connected.\n";
+		char ipAddress[16];	// IP Buffer
+
+		inet_ntop(AF_INET, &clientService.sin_addr, ipAddress, sizeof(ipAddress)); // binary to char
+		std::cout << ipAddress << "\n";
+	}
 
 	/* then call WSACleanup when done using the Winsock dll */
 
@@ -81,14 +140,8 @@ int main()
 	//   to  disables sends or receives on a socket first
 	// This isn't needed in this simple sample
 
-	err = closesocket(sock);
-	if (err == SOCKET_ERROR)
-	{
-		std::cout << "closesocket failed with error = " << WSAGetLastError() << "\n";
-		WSACleanup();
-		return 1;
-	}
-
+	// No longer need server socket
+	closesocket(listenSocket);
 	WSACleanup();	// Terminate WSA
 
 	std::cin.get();	// Prevent Exit Window

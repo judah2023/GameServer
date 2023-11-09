@@ -1,12 +1,104 @@
 ﻿// Client.cpp : 이 파일에는 'main' 함수가 포함됩니다. 거기서 프로그램 실행이 시작되고 종료됩니다.
 //
+#define WIN32_LEAN_AND_MEAN
 
+#include <Windows.h>
+#include <WinSock2.h>
+#include <WS2tcpip.h>
 #include <iostream>
+
+// Need to link with Ws2_32.lib
+#pragma comment(lib, "ws2_32.lib")
 
 int main()
 {
-    std::cout << "Hello Client!\n";
+    WORD wVersionRequested;
+    WSADATA wsaData;
+	int err;
 
+	/* Use the MAKEWORD(lowbyte, highbyte) macro declared in Windef.h */
+	wVersionRequested = MAKEWORD(2, 2);
+
+	//----------------------
+	// Initialize Winsock
+	err = WSAStartup(wVersionRequested, &wsaData);
+	if (err != ERROR_SUCCESS) // ERROR_SUCCESS = 0L
+	{
+		/* Tell the user that we could not find a usable */
+		/* Winsock DLL.                                  */
+		std::cout << "WSAStartup failed with error: " << err << "\n";
+		return 1;
+	}
+
+	/* Confirm that the WinSock DLL supports 2.2.*/
+	/* Note that if the DLL supports versions greater    */
+	/* than 2.2 in addition to 2.2, it will still return */
+	/* 2.2 in wVersion since that is the version we      */
+	/* requested.                                        */
+
+	if (LOBYTE(wsaData.wVersion) != LOBYTE(wVersionRequested) ||
+		HIBYTE(wsaData.wVersion) != HIBYTE(wVersionRequested))	// Checking Version
+	{
+		/* Tell the user that we could not find a usable */
+		/* WinSock DLL.                                  */
+		std::cout << "Could not find a usable version of Winsock.dll\n";
+		WSACleanup();
+		return 1;
+	}
+	else
+	{
+		std::cout << "The Winsock 2.2 dll was found okay\n";
+	}
+
+	/* The Winsock DLL is acceptable. Proceed to use it. */
+
+	SOCKET connectSocket = socket(AF_INET, SOCK_STREAM, 0);
+	if (connectSocket == INVALID_SOCKET)
+	{
+		std::cout << "socket function failed with error = " << WSAGetLastError() << "\n";
+		WSACleanup();
+		return 1;
+	}
+
+	std::cout << "socket function succeeded\n";
+	
+	// IPv4
+
+	//----------------------
+	// The sockaddr_in structure specifies the address family,
+	// IP address, and port for the socket that is being bound.
+	SOCKADDR_IN clientService{ 0 };
+
+	clientService.sin_family = AF_INET;						// AF_INET : IPv4
+	inet_pton(AF_INET, "127.0.0.1", &clientService.sin_addr); // IP 127.0.0.1 : MyCom IP
+	// htons : host to network short
+	clientService.sin_port = htons(7777);						// port : 7777
+
+	//----------------------
+	// Connect to server.
+	err = connect(connectSocket, (SOCKADDR*)&clientService, sizeof(clientService));
+	if (err == SOCKET_ERROR)
+	{
+		std::cout << "connect function failed with error = " << WSAGetLastError() << "\n";
+
+		closesocket(connectSocket);
+		WSACleanup();
+		return 1;
+	}
+
+	std::cout << "Connected to server.\n";
+
+	while (true)
+	{
+		std::cout << "Connecting...\n";
+		Sleep(100);
+	}
+
+
+	/* Add network programming using Winsock here */
+
+	closesocket(connectSocket);
+	WSACleanup();
     std::cin.get();	// Prevent Exit Window
     return 0;
 }
