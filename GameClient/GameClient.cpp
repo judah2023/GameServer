@@ -7,6 +7,8 @@ using namespace std;
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 
+#define DEFAULT_BUFFER_LEN 1024
+
 void PrintFailedError(SOCKET sock, const char* sentence)
 {
 	cout << sentence << " = " << WSAGetLastError() << "\n";
@@ -56,7 +58,7 @@ int main()
 
 	/* The Winsock DLL is acceptable. Proceed to use it. */
 
-	SOCKET connectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_HOPOPTS);
+	SOCKET connectSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_HOPOPTS);
 	if (connectSocket == INVALID_SOCKET)
 	{
 
@@ -74,43 +76,37 @@ int main()
 	inet_pton(AF_INET, "127.0.0.1", &service.sin_addr);
 	service.sin_port = htons(7777);
 
-	//----------------------
-	// Connect to server.
-	iResult = connect(connectSocket, (SOCKADDR*)&service, sizeof(service));
-	if (iResult == SOCKET_ERROR)
-	{
-		PrintFailedError(connectSocket, "Connect failed with error");
-		return 1;
-	}
-
-	cout << "Connected to Server.\n";
 	while (true)
 	{
-		cout << "Connecting...\n";
-	
-		// Receive until the peer closes the connection
-		char recvBuffer[1024];
-		iResult = recv(connectSocket, recvBuffer, sizeof(recvBuffer), 0);
-		if (iResult <= 0)
-		{
-			PrintFailedError(connectSocket, "Recv failed");
-			return 1;
-		}
+		cout << "\n\n=============================================================================\n";
 
-		cout << "Bytes received -> " << iResult << " byte\n";
-		cout << "recv Data -> " << recvBuffer << "\n\n";
+		char sendBuffer[DEFAULT_BUFFER_LEN] = "[Client] \"Hello, Server!\"";
 
-		char sendBuffer[1024] = "Client : Hello, Client Socket!";
-
-		iResult = send(connectSocket, sendBuffer, sizeof(sendBuffer), 0);
+		iResult = sendto(connectSocket, sendBuffer, sizeof(sendBuffer), 0, (SOCKADDR*)&service, sizeof(service));
 		if (iResult == SOCKET_ERROR)
 		{
-			PrintFailedError(connectSocket, "Send failed with error");
+			PrintFailedError(connectSocket, "Sendto failed with error");
 			return 1;
 		}
 
-		cout << "Bytes Sent -> " << iResult << " byte\n";
-		cout << "Send Data -> " << sendBuffer << "\n\n";
+		cout << "Send Data : " << sendBuffer << "\n";
+		cout << "Bytes Sent : " << iResult << " byte\n";
+
+		SOCKADDR_IN recvService{ 0 };
+		int addLen = sizeof(recvService);
+
+		char recvBuffer[DEFAULT_BUFFER_LEN];
+		iResult = recvfrom(connectSocket, recvBuffer, sizeof(recvBuffer), 0, (SOCKADDR*)&recvService, &addLen);
+		if (iResult == SOCKET_ERROR)
+		{
+			PrintFailedError(connectSocket, "Recvfrom failed with error");
+			return 1;
+		}
+
+		cout << "Recv Data : " << recvBuffer << "\n";
+		cout << "Recv Bytes : " << iResult << " byte\n";
+
+		Sleep(1000);
 	}
 
 	closesocket(connectSocket);

@@ -6,6 +6,8 @@ using namespace std;
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 
+#define DEFAULT_BUFFER_LEN 1024
+
 void PrintFailedError(SOCKET sock, const char* sentence)
 {
 	cout << sentence << " = " << WSAGetLastError() << "\n";
@@ -56,11 +58,10 @@ int main()
 	//----------------------
 	// Create a SOCKET for listening for 
 	// incoming connection requests
-	SOCKET listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_HOPOPTS);
-	if (listenSocket == INVALID_SOCKET)
+	SOCKET serverSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_HOPOPTS);
+	if (serverSocket == INVALID_SOCKET)
 	{
-
-		PrintFailedError(listenSocket, "Socket failed with error");
+		PrintFailedError(serverSocket, "Socket failed with error");
 		return 1;
 	}
 
@@ -70,81 +71,59 @@ int main()
 	// The sockaddr_in structure specifies the address family,
 	// IP address, and port for the socket that is being bound.
 	SOCKADDR_IN service{ 0 };
+	char ipAddress[16];
+
 	service.sin_family = AF_INET;						// AF_INET : IPv4
-	inet_pton(AF_INET, "127.0.0.1", &service.sin_addr); // IP 127.0.0.1 : MyCom IP
+	
+	service.sin_addr.s_addr = htonl(INADDR_ANY);
+	// Alternative
+	// inet_pton(AF_INET, "127.0.0.1", &service.sin_addr); // IP 127.0.0.1 : MyCom IP
+	
 	// htons : host to network short
 	service.sin_port = htons(7777);						// port : 7777
 
-	//----------------------
-	// Bind the socket. (SOCKET, SOCKADDR)
-	iResult = bind(listenSocket, (SOCKADDR*)&service, sizeof(service));
+	iResult = bind(serverSocket, (SOCKADDR*)&service, sizeof(service));
 	if (iResult == SOCKET_ERROR)
 	{
-		PrintFailedError(listenSocket, "Bind failed with error");
-		return 1;
-	}
-
-	//----------------------
-	// Listen for incoming connection requests 
-	// on the created socket
-	iResult = listen(listenSocket, SOMAXCONN);
-	if (iResult == SOCKET_ERROR)
-	{
-		PrintFailedError(listenSocket, "Listen failed with error");
+		PrintFailedError(serverSocket, "Bind failed with error");
 		return 1;
 	}
 
 	while (true)
 	{
-		//----------------------
-		// Create a SOCKET for accepting incoming requests.
-		cout << "\nWaiting for client to connect...\n";
+		cout << "\n\n=============================================================================\n";
+		cout << "Listening...\n";
 
-		SOCKADDR_IN clientService{ 0 }; 	// Client Socket Info
+		char recvBuffer[1024];
+		SOCKADDR_IN clientService{ 0 };
+
 		int addLen = sizeof(clientService);
 
-		//----------------------
-		// Accept the connection.
-		SOCKET acceptSocket = accept(listenSocket, (SOCKADDR*)&clientService, &addLen);
-		if (acceptSocket == INVALID_SOCKET)
-		{
-			PrintFailedError(listenSocket, "Accept failed with error");
-			return 1;
-		}
+		iResult = recvfrom(serverSocket, recvBuffer, sizeof(recvBuffer), 0, (SOCKADDR*)&clientService, &addLen);
 
-		char ipAddress[16];
-		inet_ntop(AF_INET, &clientService.sin_addr, ipAddress, sizeof(ipAddress)); // binary to char
-		cout << "Client connected IP : " << ipAddress << "\n";
-
-		//----------------------
-		// Send an initial buffer
-		char sendBuffer[1024] = "Server : Hello, Server Socket!";
-		iResult = send(acceptSocket, sendBuffer, sizeof(sendBuffer), 0);
 		if (iResult == SOCKET_ERROR)
 		{
-			PrintFailedError(acceptSocket, "Send failed with error");
+			PrintFailedError(serverSocket, "Recvfrom failed with error");
 			return 1;
 		}
 
-		cout << "Bytes Sent -> " << iResult << " byte\n";
-		cout << "Send Data -> " << sendBuffer << "\n\n";
+		inet_ntop(AF_INET, &clientService.sin_addr, ipAddress, sizeof(ipAddress));
 
-		// Receive until the peer closes the connection
-		char recvBuffer[1024];
-		iResult = recv(acceptSocket, recvBuffer, sizeof(recvBuffer), 0);
-		if (iResult > 0)
+		cout << "CLIENT_IP : " << ipAddress << "\n";
+		cout << "recv Data : " << recvBuffer << "\n";
+		cout << "recv Bytes : " << iResult << " byte\n";
+
+		char sendBuffer[DEFAULT_BUFFER_LEN] = "[Server] \"Hello, Client!\"";
+
+		iResult = sendto(serverSocket, sendBuffer, sizeof(sendBuffer), 0, (SOCKADDR*)&clientService, addLen);
+		if (iResult == SOCKET_ERROR)
 		{
-			cout << "Bytes received : " << iResult << " byte\n";
-			cout << "recv Data -> " << recvBuffer << "\n\n";
+			PrintFailedError(serverSocket, "Sendto failed with error");
+			return 1;
 		}
-		else if (iResult < 0)
-		{
-			cout << "recv failed : " << WSAGetLastError() << "\n";
-		}
-		else
-		{
-			cout << "Connection closed\n";
-		}
+
+		cout << "Send Data : " << sendBuffer << "\n";
+		cout << "Bytes Sent : " << iResult << " byte\n";
 
 	}
 
@@ -156,7 +135,7 @@ int main()
 	// This isn't needed in this simple sample
 	
 	// No longer need server socket
-	closesocket(listenSocket);
+	closesocket(serverSocket);
 	WSACleanup();
 	
 	cin.get();
