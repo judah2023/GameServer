@@ -94,28 +94,29 @@ int main()
 		return 1;
 	}
 
+	//----------------------
+	// Create a SOCKET for accepting incoming requests.
+	cout << "Waiting for client to connect...\n";
+
+	SOCKADDR_IN clientService{ 0 }; 	// Client Socket Info
+	int addLen = sizeof(clientService);
+
+	//----------------------
+	// Accept the connection.
+	SOCKET acceptSocket = accept(listenSocket, (SOCKADDR*)&clientService, &addLen);
+	if (acceptSocket == INVALID_SOCKET)
+	{
+		PrintFailedError(listenSocket, "Accept failed with error");
+		return 1;
+	}
+
+	char ipAddress[16];
+	inet_ntop(AF_INET, &clientService.sin_addr, ipAddress, sizeof(ipAddress)); // binary to char
+	cout << "Server : Client connected IP : " << ipAddress << "\n";
+
 	while (true)
 	{
-		//----------------------
-		// Create a SOCKET for accepting incoming requests.
-		cout << "\nWaiting for client to connect...\n";
-
-		SOCKADDR_IN clientService{ 0 }; 	// Client Socket Info
-		int addLen = sizeof(clientService);
-
-		//----------------------
-		// Accept the connection.
-		SOCKET acceptSocket = accept(listenSocket, (SOCKADDR*)&clientService, &addLen);
-		if (acceptSocket == INVALID_SOCKET)
-		{
-			PrintFailedError(listenSocket, "Accept failed with error");
-			return 1;
-		}
-
-		char ipAddress[16];
-		inet_ntop(AF_INET, &clientService.sin_addr, ipAddress, sizeof(ipAddress)); // binary to char
-		cout << "Client connected IP : " << ipAddress << "\n";
-
+		cout << "Listenling...\n";
 		//----------------------
 		// Send an initial buffer
 		char sendBuffer[1024] = "Server : Hello, Server Socket!";
@@ -126,24 +127,24 @@ int main()
 			return 1;
 		}
 
-		cout << "Bytes Sent -> " << iResult << " byte\n";
-		cout << "Send Data -> " << sendBuffer << "\n\n";
+		cout << "Server : Bytes Sent -> " << iResult << " byte\n";
+		cout << "Server : Send Data -> " << sendBuffer << "\n\n";
 
 		// Receive until the peer closes the connection
 		char recvBuffer[1024];
 		iResult = recv(acceptSocket, recvBuffer, sizeof(recvBuffer), 0);
 		if (iResult > 0)
 		{
-			cout << "Bytes received : " << iResult << " byte\n";
-			cout << "recv Data -> " << recvBuffer << "\n\n";
+			cout << "Server : Bytes received : " << iResult << " byte\n";
+			cout << "Server : recv Data -> " << recvBuffer << "\n\n";
 		}
 		else if (iResult < 0)
 		{
-			cout << "recv failed : " << WSAGetLastError() << "\n";
+			cout << "Server : recv failed : " << WSAGetLastError() << "\n";
 		}
 		else
 		{
-			cout << "Connection closed\n";
+			cout << "Server : Connection closed\n";
 		}
 
 	}

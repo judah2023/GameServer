@@ -86,7 +86,7 @@ int main()
 	cout << "Connected to Server.\n";
 	while (true)
 	{
-		cout << "Connecting...\n";
+		cout << "Client : Connecting...\n";
 	
 		// Receive until the peer closes the connection
 		char recvBuffer[1024];
@@ -97,8 +97,8 @@ int main()
 			return 1;
 		}
 
-		cout << "Bytes received -> " << iResult << " byte\n";
-		cout << "recv Data -> " << recvBuffer << "\n\n";
+		cout << "Client : Bytes received -> " << iResult << " byte\n";
+		cout << "Client : recv Data -> " << recvBuffer << "\n\n";
 
 		char sendBuffer[1024] = "Client : Hello, Client Socket!";
 
@@ -109,8 +109,16 @@ int main()
 			return 1;
 		}
 
-		cout << "Bytes Sent -> " << iResult << " byte\n";
-		cout << "Send Data -> " << sendBuffer << "\n\n";
+		cout << "Client : Bytes Sent -> " << iResult << " byte\n";
+		cout << "Client : Send Data -> " << sendBuffer << "\n\n";
+
+		// Press Enter
+		if (GetAsyncKeyState(VK_RETURN))
+		{
+			shutdown(connectSocket, SD_SEND);
+		}
+
+		Sleep(100);
 	}
 
 	closesocket(connectSocket);
