@@ -7,8 +7,6 @@ using namespace std;
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 
-#define DEFAULT_BUFFER_LEN 1024
-
 void PrintFailedError(SOCKET sock, const char* sentence)
 {
 	cout << sentence << " = " << WSAGetLastError() << "\n";
@@ -58,7 +56,7 @@ int main()
 
 	/* The Winsock DLL is acceptable. Proceed to use it. */
 
-	SOCKET connectSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_HOPOPTS);
+	SOCKET connectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_HOPOPTS);
 	if (connectSocket == INVALID_SOCKET)
 	{
 
@@ -66,9 +64,22 @@ int main()
 		return 1;
 	}
 
-	// IPv4
+	//-------------------------
+	// Set the socket I/O mode: In this case FIONBIO
+	// enables or disables the blocking mode for the 
+	// socket based on the numerical value of iMode.
+	// If iMode = 0, blocking is enabled; 
+	// If iMode != 0, non-blocking mode is enabled.
+	u_long iMode = 1;
+	iResult = ioctlsocket(connectSocket, FIONBIO, &iMode);
+	if (iResult == INVALID_SOCKET)
+	{
+		PrintFailedError(connectSocket, "Ioctlsocket failed with error");
+		return 1;
+	}
 
 	//----------------------
+	// IPv4
 	// The sockaddr_in structure specifies the address family,
 	// IP address, and port for the socket that is being bound.
 	SOCKADDR_IN service{ 0 };
@@ -78,36 +89,72 @@ int main()
 
 	while (true)
 	{
-		cout << "\n\n=============================================================================\n";
 
-		char sendBuffer[DEFAULT_BUFFER_LEN] = "[Client] \"Hello, Server!\"";
-
-		iResult = sendto(connectSocket, sendBuffer, sizeof(sendBuffer), 0, (SOCKADDR*)&service, sizeof(service));
+		//----------------------
+		// Connect to server.
+		iResult = connect(connectSocket, (SOCKADDR*)&service, sizeof(service));
 		if (iResult == SOCKET_ERROR)
 		{
-			PrintFailedError(connectSocket, "Sendto failed with error");
+			if (WSAGetLastError() == WSAEWOULDBLOCK)
+			{
+				cout << "[Client]\t Waiting Server...\n";
+				continue;
+			}
+
+			if (WSAGetLastError() == WSAEALREADY)
+			{
+				continue;
+			}
+
+			if (WSAGetLastError() == WSAEISCONN)
+			{
+				cout << "[Client]\t Already Connected.\n";
+				break;
+			}
+
+			PrintFailedError(connectSocket, "Connect failed with error");
 			return 1;
 		}
+	}
 
-		cout << "Send Data : " << sendBuffer << "\n";
-		cout << "Bytes Sent : " << iResult << " byte\n";
+	cout << "[Client]\t Connected to Server.\n";
+	char sendBuffer[1024] = "[Client]\t Hello, Client Socket!";
 
-		SOCKADDR_IN recvService{ 0 };
-		int addLen = sizeof(recvService);
+	while (true)
+	{
+		cout << "\n=====================================================================\n";
+		cout << "[Client]\t Connecting...\n";
 
-		char recvBuffer[DEFAULT_BUFFER_LEN];
-		iResult = recvfrom(connectSocket, recvBuffer, sizeof(recvBuffer), 0, (SOCKADDR*)&recvService, &addLen);
+
+		iResult = send(connectSocket, sendBuffer, sizeof(sendBuffer), 0);
 		if (iResult == SOCKET_ERROR)
 		{
-			PrintFailedError(connectSocket, "Recvfrom failed with error");
-			return 1;
+			if (WSAGetLastError() == WSAEWOULDBLOCK)
+			{
+				cout << "[Client]\t Waiting Data...\n";
+				continue;
+			}
+
+			break; // Unexpected Error
+		}
+		else if (iResult == 0)
+		{
+			cout << "[Client]\t Null Data!\n";
+			break;
 		}
 
-		cout << "Recv Data : " << recvBuffer << "\n";
-		cout << "Recv Bytes : " << iResult << " byte\n";
+		cout << "[Client]\t Send Data : " << sendBuffer << "\n";
+		cout << "[Client]\t Bytes Sent : " << iResult << " byte\n";
+
+		// Press Enter
+		if (GetAsyncKeyState(VK_RETURN))
+		{
+			shutdown(connectSocket, SD_SEND);
+		}
 
 		Sleep(1000);
 	}
+
 
 	closesocket(connectSocket);
 	WSACleanup();

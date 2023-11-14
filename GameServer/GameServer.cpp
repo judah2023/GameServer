@@ -6,7 +6,9 @@ using namespace std;
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 
-#define DEFAULT_BUFFER_LEN 1024
+#include <vector>
+
+#define DEFAULT_BUF_LEN 1024
 
 void PrintFailedError(SOCKET sock, const char* sentence)
 {
@@ -58,75 +60,98 @@ int main()
 	//----------------------
 	// Create a SOCKET for listening for 
 	// incoming connection requests
-	SOCKET serverSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_HOPOPTS);
-	if (serverSocket == INVALID_SOCKET)
+	SOCKET listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_HOPOPTS);
+	if (listenSocket == INVALID_SOCKET)
 	{
-		PrintFailedError(serverSocket, "Socket failed with error");
+		PrintFailedError(listenSocket, "Socket failed with error");
 		return 1;
 	}
 
-	// IPv4
+	//-------------------------
+	// Set the socket I/O mode: In this case FIONBIO
+	// enables or disables the blocking mode for the 
+	// socket based on the numerical value of iMode.
+	// If iMode = 0, blocking is enabled; 
+	// If iMode != 0, non-blocking mode is enabled.
+	u_long iMode = 1;
+	iResult = ioctlsocket(listenSocket, FIONBIO, &iMode);
+	if (iResult == INVALID_SOCKET)
+	{
+		PrintFailedError(listenSocket, "Ioctlsocket failed with error");
+		return 1;
+	}
 
 	//----------------------
+	// IPv4
 	// The sockaddr_in structure specifies the address family,
 	// IP address, and port for the socket that is being bound.
 	SOCKADDR_IN service{ 0 };
-	char ipAddress[16];
-
 	service.sin_family = AF_INET;						// AF_INET : IPv4
-	
-	service.sin_addr.s_addr = htonl(INADDR_ANY);
-	// Alternative
-	// inet_pton(AF_INET, "127.0.0.1", &service.sin_addr); // IP 127.0.0.1 : MyCom IP
-	
+	inet_pton(AF_INET, "127.0.0.1", &service.sin_addr); // IP 127.0.0.1 : MyCom IP
 	// htons : host to network short
 	service.sin_port = htons(7777);						// port : 7777
 
-	iResult = bind(serverSocket, (SOCKADDR*)&service, sizeof(service));
+	//----------------------
+	// Bind the socket. (SOCKET, SOCKADDR)
+	iResult = bind(listenSocket, (SOCKADDR*)&service, sizeof(service));
 	if (iResult == SOCKET_ERROR)
 	{
-		PrintFailedError(serverSocket, "Bind failed with error");
+		PrintFailedError(listenSocket, "Bind failed with error");
 		return 1;
 	}
 
-	while (true)
+	//----------------------
+	// Listen for incoming connection requests 
+	// on the created socket
+	iResult = listen(listenSocket, SOMAXCONN);
+	if (iResult == SOCKET_ERROR)
 	{
-		cout << "\n\n=============================================================================\n";
-		cout << "Listening...\n";
-
-		char recvBuffer[1024];
-		SOCKADDR_IN clientService{ 0 };
-
-		int addLen = sizeof(clientService);
-
-		iResult = recvfrom(serverSocket, recvBuffer, sizeof(recvBuffer), 0, (SOCKADDR*)&clientService, &addLen);
-
-		if (iResult == SOCKET_ERROR)
-		{
-			PrintFailedError(serverSocket, "Recvfrom failed with error");
-			return 1;
-		}
-
-		inet_ntop(AF_INET, &clientService.sin_addr, ipAddress, sizeof(ipAddress));
-
-		cout << "CLIENT_IP : " << ipAddress << "\n";
-		cout << "recv Data : " << recvBuffer << "\n";
-		cout << "recv Bytes : " << iResult << " byte\n";
-
-		char sendBuffer[DEFAULT_BUFFER_LEN] = "[Server] \"Hello, Client!\"";
-
-		iResult = sendto(serverSocket, sendBuffer, sizeof(sendBuffer), 0, (SOCKADDR*)&clientService, addLen);
-		if (iResult == SOCKET_ERROR)
-		{
-			PrintFailedError(serverSocket, "Sendto failed with error");
-			return 1;
-		}
-
-		cout << "Send Data : " << sendBuffer << "\n";
-		cout << "Bytes Sent : " << iResult << " byte\n";
-
+		PrintFailedError(listenSocket, "Listen failed with error");
+		return 1;
 	}
 
+	//----------------------
+	// Create a SOCKET for accepting incoming requests.
+	cout << "[Server]\t Waiting for client to connect...\n";
+
+	vector<SOCKET> sockets;
+
+	fd_set reads;
+	fd_set writes;
+
+	while (true)
+	{
+		FD_ZERO(&reads);
+
+		for (auto& sock : sockets)
+		{
+			FD_SET(sock, &reads);
+		}
+
+		FD_SET(listenSocket, &reads);
+
+		cout << "Hello, ";
+
+		iResult = select(NULL, &reads, nullptr, nullptr, nullptr);
+
+		cout << "World\n";
+
+		if (iResult == SOCKET_ERROR)
+		{
+			break;
+		}
+
+		bool isSet = FD_ISSET(listenSocket, &reads);
+		if (isSet)
+		{
+			SOCKET acceptSocket = accept(listenSocket, nullptr, nullptr);
+
+			sockets.push_back(acceptSocket);
+
+			cout << "[Server]\t Client Connected!\n";
+		}
+	}
+	
 	/* then call WSACleanup when done using the Winsock dll */
 
 	// Close the socket to release the resources associated
@@ -135,7 +160,7 @@ int main()
 	// This isn't needed in this simple sample
 	
 	// No longer need server socket
-	closesocket(serverSocket);
+	closesocket(listenSocket);
 	WSACleanup();
 	
 	cin.get();
