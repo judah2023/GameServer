@@ -10,6 +10,17 @@ using namespace std;
 
 #define DEFAULT_BUF_LEN 1024
 
+struct Session
+{
+	SOCKET sock = INVALID_SOCKET;
+	char recvBuffer[DEFAULT_BUF_LEN]{};
+	char sendBuffer[DEFAULT_BUF_LEN]{};
+	UINT64 recvLen = 0;
+	UINT64 sendLen = 0;
+
+	Session(SOCKET inSocket) : sock(inSocket) {}
+};
+
 void PrintFailedError(SOCKET sock, const char* sentence)
 {
 	cout << sentence << " = " << WSAGetLastError() << "\n";
@@ -115,26 +126,33 @@ int main()
 	cout << "[Server]\t Waiting for client to connect...\n";
 
 	vector<SOCKET> sockets;
+	vector<Session> sessions;
 
 	fd_set reads;
 	fd_set writes;
 
 	while (true)
 	{
+		cout << "\n=========================================================================\n";
 		FD_ZERO(&reads);
+		FD_ZERO(&writes);
 
 		for (auto& sock : sockets)
 		{
 			FD_SET(sock, &reads);
+			FD_SET(sock, &writes);
+		}
+
+		for (auto& session : sessions)
+		{
+			FD_SET(session.sock, &reads);
+			FD_SET(session.sock, &writes);
 		}
 
 		FD_SET(listenSocket, &reads);
 
-		cout << "Hello, ";
-
-		iResult = select(NULL, &reads, nullptr, nullptr, nullptr);
-
-		cout << "World\n";
+		cout << "[Server]\t Listening...\n";
+		iResult = select(NULL, &reads, &writes, nullptr, nullptr);	// (reads is valid) || (write is valid)
 
 		if (iResult == SOCKET_ERROR)
 		{
@@ -147,9 +165,49 @@ int main()
 			SOCKET acceptSocket = accept(listenSocket, nullptr, nullptr);
 
 			sockets.push_back(acceptSocket);
+			sessions.push_back(Session(acceptSocket));
 
 			cout << "[Server]\t Client Connected!\n";
 		}
+
+		for (SOCKET& sock : sockets)
+		{
+			isSet = FD_ISSET(sock, &reads);
+			if (isSet)
+			{
+				char recvBuffer[DEFAULT_BUF_LEN];
+				iResult = recv(sock, recvBuffer, sizeof(recvBuffer), 0);
+				if (iResult <= 0)
+				{
+					sockets.erase(remove(sockets.begin(), sockets.end(), sock), sockets.end());
+					cout << "[Server]\t Remove Invalid Socket\n";
+					continue;	// null data
+				}
+
+				cout << "[Server]\t recv Data : " << recvBuffer << "\n";
+				cout << "[Server]\t recv Bytes : " << iResult << " byte\n";
+			}
+
+			isSet = FD_ISSET(sock, &writes);
+			if (isSet)
+			{
+				char sendBuffer[DEFAULT_BUF_LEN] = "[Server]\t Hello, This is Server's Data!";
+
+				iResult = send(sock, sendBuffer, size(sendBuffer), 0);
+				if (iResult == SOCKET_ERROR)
+				{
+					sockets.erase(remove(sockets.begin(), sockets.end(), sock), sockets.end());
+					cout << "[Server]\t Remove Invalid Socket\n";
+					continue;
+				}
+
+				cout << "[Server]\t send Data : " << sendBuffer << "\n";
+				cout << "[Server]\t send Bytes : " << iResult << " byte\n";
+
+			}
+		}
+
+		Sleep(100);
 	}
 	
 	/* then call WSACleanup when done using the Winsock dll */

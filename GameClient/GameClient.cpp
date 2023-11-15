@@ -118,7 +118,7 @@ int main()
 	}
 
 	cout << "[Client]\t Connected to Server.\n";
-	char sendBuffer[1024] = "[Client]\t Hello, Client Socket!";
+	char sendBuffer[1024] = "[Client]\t Hello, This is Client's Data!";
 
 	while (true)
 	{
