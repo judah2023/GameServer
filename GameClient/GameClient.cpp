@@ -122,6 +122,7 @@ int main()
 
 	while (true)
 	{
+		Sleep(1000);
 		cout << "\n=====================================================================\n";
 		cout << "[Client]\t Connecting...\n";
 
@@ -146,13 +147,33 @@ int main()
 		cout << "[Client]\t Send Data : " << sendBuffer << "\n";
 		cout << "[Client]\t Bytes Sent : " << iResult << " byte\n";
 
+		char recvBuffer[1024];
+		iResult = recv(connectSocket, recvBuffer, sizeof(recvBuffer), 0);
+		if (iResult == SOCKET_ERROR)
+		{
+			if (WSAGetLastError() == WSAEWOULDBLOCK)
+			{
+				cout << "[Client]\t Waiting Data...\n";
+				continue;
+			}
+
+			break; // Unexpected Error
+		}
+		else if (iResult == 0)
+		{
+			cout << "[Client]\t Null Data!\n";
+			break;
+		}
+
+		cout << "[Client]\t recv Data : " << recvBuffer << "\n";
+		cout << "[Client]\t Bytes Sent : " << iResult << " byte\n";
+
 		// Press Enter
 		if (GetAsyncKeyState(VK_RETURN))
 		{
 			shutdown(connectSocket, SD_SEND);
 		}
 
-		Sleep(1000);
 	}
 
 

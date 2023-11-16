@@ -126,89 +126,156 @@ int main()
 	cout << "[Server]\t Waiting for client to connect...\n";
 
 	vector<SOCKET> sockets;
-	vector<Session> sessions;
+	vector<WSAEVENT> wsaEvents;
+	
+	sockets.push_back(listenSocket);
 
-	fd_set reads;
-	fd_set writes;
+	//-------------------------
+	// Create new event
+	WSAEVENT listenEvent = WSACreateEvent();
+	wsaEvents.push_back(listenEvent);
+
+	//-------------------------
+	// Associate event types FD_ACCEPT and FD_CLOSE
+	// with the listening socket and NewEvent
+	iResult = WSAEventSelect(listenSocket, listenEvent, FD_ACCEPT | FD_CLOSE);
+	if (iResult == SOCKET_ERROR)
+	{
+		PrintFailedError(listenSocket, "WSAEventSelect failed with errer : ");
+		return 1;
+	}
 
 	while (true)
 	{
-		cout << "\n=========================================================================\n";
-		FD_ZERO(&reads);
-		FD_ZERO(&writes);
+		cout << "\n============================================================================================\n";
+		//WSAWaitForMultipleEvents : 여러 이벤트를 감시
+		//cEvents : 이벤트 갯수
+		//lphEvents : 이벤트 배열의 시작점 주소	//->[][][][][]
+		//fWaitAll : (true)모든 이벤트들을 기다릴것인지, (false) 준비 되는 값을 반환
+		//dwTimeout : 이벤트를 기다리는 시간
+		//fAlertable : 스레드 경고 가능한 대기 상태에 배치되는지 여부를 지정하는 값
 
-		for (auto& sock : sockets)
+		//wsaEvents.size() : 이벤트 갯수
+		//&wsaEvents[0] : vector wsaEvents의 배열 첫번째 주소
+		//FALSE : 준비되는 족족 반환
+		//WSA_INFINITE : 무한 계속~
+		//FALSE : 값 설정 안함
+		DWORD index = WSAWaitForMultipleEvents(wsaEvents.size(), wsaEvents.data(), false, WSA_INFINITE, false);
+		if (index == WSA_WAIT_FAILED)
 		{
-			FD_SET(sock, &reads);
-			FD_SET(sock, &writes);
+			// Dormammu!
+			continue;
 		}
 
-		for (auto& session : sessions)
-		{
-			FD_SET(session.sock, &reads);
-			FD_SET(session.sock, &writes);
-		}
+		index -= WSA_WAIT_EVENT_0;
 
-		FD_SET(listenSocket, &reads);
 
-		cout << "[Server]\t Listening...\n";
-		iResult = select(NULL, &reads, &writes, nullptr, nullptr);	// (reads is valid) || (write is valid)
-
+		WSANETWORKEVENTS networkEvent;
+		// WSAEnumNetworkEvents : 소켓과 이벤트가 어떤 상태인지 확인하기 위해 사용
+		// [in] s : socket
+		// [in] hEventObject : Event
+		// [out] lpNetworkEvents : Handle of Object for identifying
+		iResult = WSAEnumNetworkEvents(sockets[index], wsaEvents[index], &networkEvent);
 		if (iResult == SOCKET_ERROR)
 		{
-			break;
+			// Dormammu!
+			continue;
 		}
-
-		bool isSet = FD_ISSET(listenSocket, &reads);
-		if (isSet)
+		
+		// check listenSocket : ready accept
+		if (networkEvent.lNetworkEvents & FD_ACCEPT)
 		{
+			// chech Error
+			if (networkEvent.iErrorCode[FD_ACCEPT_BIT] != ERROR_SUCCESS)
+			{
+				// Dormammu!
+				continue;
+			}
+
+			// All Grean!
 			SOCKET acceptSocket = accept(listenSocket, nullptr, nullptr);
+			if (acceptSocket == INVALID_SOCKET)
+			{
+				PrintFailedError(acceptSocket, "Accept failed with error : ");
+				return 1;
+			}
+
+			cout << "[Server]\t Complete to connect Client!\n";
+
+			WSAEVENT acceptEvent = WSACreateEvent();
+			
+			iResult = WSAEventSelect(acceptSocket, acceptEvent, FD_READ | FD_WRITE | FD_CLOSE);
+			if (iResult == SOCKET_ERROR)
+			{
+				closesocket(acceptSocket);
+				PrintFailedError(listenSocket, "WSAEventSelect failed with errer : ");
+				return 1;
+			}
 
 			sockets.push_back(acceptSocket);
-			sessions.push_back(Session(acceptSocket));
-
-			cout << "[Server]\t Client Connected!\n";
+			wsaEvents.push_back(acceptEvent);
 		}
 
-		for (SOCKET& sock : sockets)
-		{
-			isSet = FD_ISSET(sock, &reads);
-			if (isSet)
-			{
-				char recvBuffer[DEFAULT_BUF_LEN];
-				iResult = recv(sock, recvBuffer, sizeof(recvBuffer), 0);
-				if (iResult <= 0)
-				{
-					sockets.erase(remove(sockets.begin(), sockets.end(), sock), sockets.end());
-					cout << "[Server]\t Remove Invalid Socket\n";
-					continue;	// null data
-				}
+		SOCKET& sock = sockets[index];
 
-				cout << "[Server]\t recv Data : " << recvBuffer << "\n";
-				cout << "[Server]\t recv Bytes : " << iResult << " byte\n";
+		// check listenSocket : ready read
+		if (networkEvent.lNetworkEvents & FD_READ)
+		{
+			// chech Error
+			if (networkEvent.iErrorCode[FD_ACCEPT_BIT] != ERROR_SUCCESS)
+			{
+				// Dormammu!
+				continue;
 			}
 
-			isSet = FD_ISSET(sock, &writes);
-			if (isSet)
-			{
-				char sendBuffer[DEFAULT_BUF_LEN] = "[Server]\t Hello, This is Server's Data!";
 
-				iResult = send(sock, sendBuffer, size(sendBuffer), 0);
-				if (iResult == SOCKET_ERROR)
+			char recvBuffer[DEFAULT_BUF_LEN];
+			iResult = recv(sock, recvBuffer, sizeof(recvBuffer), 0);
+			if (iResult == SOCKET_ERROR)
+			{
+				if (WSAGetLastError() != WSAEWOULDBLOCK)
 				{
-					sockets.erase(remove(sockets.begin(), sockets.end(), sock), sockets.end());
-					cout << "[Server]\t Remove Invalid Socket\n";
 					continue;
 				}
-
-				cout << "[Server]\t send Data : " << sendBuffer << "\n";
-				cout << "[Server]\t send Bytes : " << iResult << " byte\n";
-
 			}
+
+			cout << "[Server]\t recv Data : " << recvBuffer << "\n";
+
 		}
 
-		Sleep(100);
+		// check listenSocket : ready write
+		if (networkEvent.lNetworkEvents & FD_WRITE)
+		{
+			// chech Error
+			if (networkEvent.iErrorCode[FD_ACCEPT_BIT] != ERROR_SUCCESS)
+			{
+				// Dormammu!
+				continue;
+			}
+
+			char sendBuffer[DEFAULT_BUF_LEN];
+			iResult = send(sock, sendBuffer, sizeof(sendBuffer), 0);
+			if (iResult == SOCKET_ERROR)
+			{
+				if (WSAGetLastError() != WSAEWOULDBLOCK)
+				{
+					continue;
+				}
+			}
+
+			cout << "[Server]\t send Data : " << sendBuffer << "\n";
+		}
+
+		if (networkEvent.lNetworkEvents & FD_CLOSE)
+		{
+			//연결 끊겼다면 해당 vector에서 제거
+			sockets.erase(sockets.begin() + index);
+			wsaEvents.erase(wsaEvents.begin() + index);
+		}
+
+		Sleep(1000);
 	}
+
 	
 	/* then call WSACleanup when done using the Winsock dll */
 
