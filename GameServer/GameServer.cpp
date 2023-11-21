@@ -7,18 +7,18 @@ using namespace std;
 #include <WS2tcpip.h>
 
 #include <vector>
+#include <thread>
 
-#define DEFAULT_BUF_LEN 1024
+#define DATA_BUFSIZE 4096
 
 struct Session
 {
-	SOCKET sock = INVALID_SOCKET;
-	char recvBuffer[DEFAULT_BUF_LEN]{};
-	char sendBuffer[DEFAULT_BUF_LEN]{};
-	UINT64 recvLen = 0;
-	UINT64 sendLen = 0;
+	WSAOVERLAPPED overlapped = {};
+	SOCKET socket = INVALID_SOCKET;
+	char buffer[DATA_BUFSIZE] = {};
 
-	Session(SOCKET inSocket) : sock(inSocket) {}
+	Session() = default;
+	Session(SOCKET inSocket) : socket(inSocket) {}
 };
 
 void PrintFailedError(SOCKET sock, const char* sentence)
@@ -28,37 +28,62 @@ void PrintFailedError(SOCKET sock, const char* sentence)
 	WSACleanup();
 }
 
+// IOCP를 사용하여 수신된 데이터를 처리하는 함수
+void RecvThread(HANDLE iocpHandle)
+{
+	DWORD bytesTransferred = 0;
+	ULONG_PTR key = 0;
+	Session* session = nullptr;
+	WSAOVERLAPPED* overlapped = {};
+
+	int err = 0;
+
+	// Todo
+	while (true)
+	{
+		cout << "\n=====================================================================\n";
+		cout << "[Server]\t Waiting...\n";
+		// IOCP에서 작업이 완료될 때까지 대기
+		err = GetQueuedCompletionStatus(iocpHandle, &bytesTransferred, &key, (LPOVERLAPPED*)&overlapped, INFINITE);
+		if (err)
+		{
+			session = (Session*)overlapped;
+			cout << "\t\tData : " << session->buffer << "\n";
+			cout << "\t\tData Length : " << bytesTransferred << "\n";
+			cout << "\t\tData key : " << key << "\n";
+
+			WSABUF wsaBuf;
+			wsaBuf.buf = session->buffer;
+			wsaBuf.len = sizeof(session->buffer);
+
+			DWORD recvLen = 0;
+			DWORD flags = 0;
+
+			WSARecv(session->socket, &wsaBuf, 1, &recvLen, &flags, &session->overlapped, nullptr);
+			Sleep(1000);
+		}
+	}
+}
+
 int main()
 {
 	WORD wVersionRequested;
 	WSADATA wsaData;
-	int iResult;
+	int rc;
+	int err = 0;
 
-	/* Use the MAKEWORD(lowbyte, highbyte) macro declared in Windef.h */
 	wVersionRequested = MAKEWORD(2, 2);
 
-	//----------------------
-	// Initialize Winsock
-	iResult = WSAStartup(wVersionRequested, &wsaData);
-	if (iResult != ERROR_SUCCESS) // ERROR_SUCCESS = 0L
+	rc = WSAStartup(wVersionRequested, &wsaData);
+	if (rc != ERROR_SUCCESS) // ERROR_SUCCESS = 0L
 	{
-		/* Tell the user that we could not find a usable */
-		/* Winsock DLL.                                  */
 		cout << "WSAStartup failed with error.\n";
 		return 1;
 	}
 
-	/* Confirm that the WinSock DLL supports 2.2.*/
-	/* Note that if the DLL supports versions greater    */
-	/* than 2.2 in addition to 2.2, it will still return */
-	/* 2.2 in wVersion since that is the version we      */
-	/* requested.                                        */
-
 	if (LOBYTE(wsaData.wVersion) != LOBYTE(wVersionRequested) ||
-		HIBYTE(wsaData.wVersion) != HIBYTE(wVersionRequested))	// Checking Version
+		HIBYTE(wsaData.wVersion) != HIBYTE(wVersionRequested))	
 	{
-		/* Tell the user that we could not find a usable */
-		/* WinSock DLL.                                  */
 		std::cout << "Could not find a usable version of Winsock.dll\n";
 		WSACleanup();
 		return 1;
@@ -68,9 +93,6 @@ int main()
 		std::cout << "The Winsock 2.2 dll was found okay\n\n";
 	}
 
-	//----------------------
-	// Create a SOCKET for listening for 
-	// incoming connection requests
 	SOCKET listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_HOPOPTS);
 	if (listenSocket == INVALID_SOCKET)
 	{
@@ -78,213 +100,61 @@ int main()
 		return 1;
 	}
 
-	//-------------------------
-	// Set the socket I/O mode: In this case FIONBIO
-	// enables or disables the blocking mode for the 
-	// socket based on the numerical value of iMode.
-	// If iMode = 0, blocking is enabled; 
-	// If iMode != 0, non-blocking mode is enabled.
-	u_long iMode = 1;
-	iResult = ioctlsocket(listenSocket, FIONBIO, &iMode);
-	if (iResult == INVALID_SOCKET)
-	{
-		PrintFailedError(listenSocket, "Ioctlsocket failed with error");
-		return 1;
-	}
-
-	//----------------------
-	// IPv4
-	// The sockaddr_in structure specifies the address family,
-	// IP address, and port for the socket that is being bound.
 	SOCKADDR_IN service{ 0 };
-	service.sin_family = AF_INET;						// AF_INET : IPv4
-	inet_pton(AF_INET, "127.0.0.1", &service.sin_addr); // IP 127.0.0.1 : MyCom IP
-	// htons : host to network short
-	service.sin_port = htons(7777);						// port : 7777
+	service.sin_family = AF_INET;						
+	inet_pton(AF_INET, "127.0.0.1", &service.sin_addr); 
+	service.sin_port = htons(7777);						
 
-	//----------------------
-	// Bind the socket. (SOCKET, SOCKADDR)
-	iResult = bind(listenSocket, (SOCKADDR*)&service, sizeof(service));
-	if (iResult == SOCKET_ERROR)
+	rc = bind(listenSocket, (SOCKADDR*)&service, sizeof(service));
+	if (rc == SOCKET_ERROR)
 	{
 		PrintFailedError(listenSocket, "Bind failed with error");
 		return 1;
 	}
 
-	//----------------------
-	// Listen for incoming connection requests 
-	// on the created socket
-	iResult = listen(listenSocket, SOMAXCONN);
-	if (iResult == SOCKET_ERROR)
+	rc = listen(listenSocket, SOMAXCONN);
+	if (rc == SOCKET_ERROR)
 	{
 		PrintFailedError(listenSocket, "Listen failed with error");
 		return 1;
 	}
 
-	//----------------------
-	// Create a SOCKET for accepting incoming requests.
 	cout << "[Server]\t Waiting for client to connect...\n";
 
-	vector<SOCKET> sockets;
-	vector<WSAEVENT> wsaEvents;
-	
-	sockets.push_back(listenSocket);
-
-	//-------------------------
-	// Create new event
-	WSAEVENT listenEvent = WSACreateEvent();
-	wsaEvents.push_back(listenEvent);
-
-	//-------------------------
-	// Associate event types FD_ACCEPT and FD_CLOSE
-	// with the listening socket and NewEvent
-	iResult = WSAEventSelect(listenSocket, listenEvent, FD_ACCEPT | FD_CLOSE);
-	if (iResult == SOCKET_ERROR)
-	{
-		PrintFailedError(listenSocket, "WSAEventSelect failed with errer : ");
-		return 1;
-	}
+	// IOCP 핸들 생성
+	HANDLE iocpHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, NULL);
+	thread t(RecvThread, iocpHandle);
 
 	while (true)
 	{
-		cout << "\n============================================================================================\n";
-		//WSAWaitForMultipleEvents : 여러 이벤트를 감시
-		//cEvents : 이벤트 갯수
-		//lphEvents : 이벤트 배열의 시작점 주소	//->[][][][][]
-		//fWaitAll : (true)모든 이벤트들을 기다릴것인지, (false) 준비 되는 값을 반환
-		//dwTimeout : 이벤트를 기다리는 시간
-		//fAlertable : 스레드 경고 가능한 대기 상태에 배치되는지 여부를 지정하는 값
-
-		//wsaEvents.size() : 이벤트 갯수
-		//&wsaEvents[0] : vector wsaEvents의 배열 첫번째 주소
-		//FALSE : 준비되는 족족 반환
-		//WSA_INFINITE : 무한 계속~
-		//FALSE : 값 설정 안함
-		DWORD index = WSAWaitForMultipleEvents(wsaEvents.size(), wsaEvents.data(), false, WSA_INFINITE, false);
-		if (index == WSA_WAIT_FAILED)
+		SOCKET acceptSocket = accept(listenSocket, NULL, NULL);
+		if (acceptSocket == INVALID_SOCKET)
 		{
-			// Dormammu!
-			continue;
+			closesocket(listenSocket);
+			WSACleanup();
+			return 1;
 		}
 
-		index -= WSA_WAIT_EVENT_0;
+		cout << "[Server]\t Client Connected!!!\n";
+
+		// Session* session = new Session(acceptSocket);
+		shared_ptr<Session> session = make_shared<Session>(acceptSocket);
+
+		CreateIoCompletionPort((HANDLE)acceptSocket, iocpHandle, (ULONG_PTR)session.get(), 0);
 
 
-		WSANETWORKEVENTS networkEvent;
-		// WSAEnumNetworkEvents : 소켓과 이벤트가 어떤 상태인지 확인하기 위해 사용
-		// [in] s : socket
-		// [in] hEventObject : Event
-		// [out] lpNetworkEvents : Handle of Object for identifying
-		iResult = WSAEnumNetworkEvents(sockets[index], wsaEvents[index], &networkEvent);
-		if (iResult == SOCKET_ERROR)
-		{
-			// Dormammu!
-			continue;
-		}
-		
-		// check listenSocket : ready accept
-		if (networkEvent.lNetworkEvents & FD_ACCEPT)
-		{
-			// chech Error
-			if (networkEvent.iErrorCode[FD_ACCEPT_BIT] != ERROR_SUCCESS)
-			{
-				// Dormammu!
-				continue;
-			}
+		// 수신 버퍼 설정 및 WSARecv 호출
+		WSABUF wsaBuf;
+		wsaBuf.buf = session->buffer;
+		wsaBuf.len = sizeof(session->buffer);
 
-			// All Grean!
-			SOCKET acceptSocket = accept(listenSocket, nullptr, nullptr);
-			if (acceptSocket == INVALID_SOCKET)
-			{
-				PrintFailedError(acceptSocket, "Accept failed with error : ");
-				return 1;
-			}
+		DWORD recvLen = 0;
+		DWORD flags = 0;
 
-			cout << "[Server]\t Complete to connect Client!\n";
-
-			WSAEVENT acceptEvent = WSACreateEvent();
-			
-			iResult = WSAEventSelect(acceptSocket, acceptEvent, FD_READ | FD_WRITE | FD_CLOSE);
-			if (iResult == SOCKET_ERROR)
-			{
-				closesocket(acceptSocket);
-				PrintFailedError(listenSocket, "WSAEventSelect failed with errer : ");
-				return 1;
-			}
-
-			sockets.push_back(acceptSocket);
-			wsaEvents.push_back(acceptEvent);
-		}
-
-		SOCKET& sock = sockets[index];
-
-		// check listenSocket : ready read
-		if (networkEvent.lNetworkEvents & FD_READ)
-		{
-			// chech Error
-			if (networkEvent.iErrorCode[FD_ACCEPT_BIT] != ERROR_SUCCESS)
-			{
-				// Dormammu!
-				continue;
-			}
-
-
-			char recvBuffer[DEFAULT_BUF_LEN];
-			iResult = recv(sock, recvBuffer, sizeof(recvBuffer), 0);
-			if (iResult == SOCKET_ERROR)
-			{
-				if (WSAGetLastError() != WSAEWOULDBLOCK)
-				{
-					continue;
-				}
-			}
-
-			cout << "[Server]\t recv Data : " << recvBuffer << "\n";
-
-		}
-
-		// check listenSocket : ready write
-		if (networkEvent.lNetworkEvents & FD_WRITE)
-		{
-			// chech Error
-			if (networkEvent.iErrorCode[FD_ACCEPT_BIT] != ERROR_SUCCESS)
-			{
-				// Dormammu!
-				continue;
-			}
-
-			char sendBuffer[DEFAULT_BUF_LEN];
-			iResult = send(sock, sendBuffer, sizeof(sendBuffer), 0);
-			if (iResult == SOCKET_ERROR)
-			{
-				if (WSAGetLastError() != WSAEWOULDBLOCK)
-				{
-					continue;
-				}
-			}
-
-			cout << "[Server]\t send Data : " << sendBuffer << "\n";
-		}
-
-		if (networkEvent.lNetworkEvents & FD_CLOSE)
-		{
-			//연결 끊겼다면 해당 vector에서 제거
-			sockets.erase(sockets.begin() + index);
-			wsaEvents.erase(wsaEvents.begin() + index);
-		}
-
-		Sleep(1000);
+		WSARecv(session->socket, &wsaBuf, 1, &recvLen, &flags, &session->overlapped, NULL);
+		t.join();
 	}
 
-	
-	/* then call WSACleanup when done using the Winsock dll */
-
-	// Close the socket to release the resources associated
-	// Normally an application calls shutdown() before closesocket 
-	//   to  disables sends or receives on a socket first
-	// This isn't needed in this simple sample
-	
-	// No longer need server socket
 	closesocket(listenSocket);
 	WSACleanup();
 	
