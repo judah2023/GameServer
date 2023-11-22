@@ -78,6 +78,19 @@ int main()
 		return 1;
 	}
 
+	// TCP_NODELAY :  네트워크 통신에서 지연(latency)를 최소하기 위해 설정
+	//옵션 사용하면 TCP소켓이 데이터를 즉시 보내도록 설정
+	bool isEnabled = true;
+	rc = setsockopt(listenSocket, IPPROTO_TCP, TCP_NODELAY, (char*)&isEnabled, sizeof(isEnabled));
+	if (rc == SOCKET_ERROR)
+	{
+		cout << "setsockopt for TCP_NODELAY failed with error : " << WSAGetLastError() << "\n";
+	}
+	else
+	{
+		cout << "TCP_NODELAY Value : " << isEnabled << "\n";
+	}
+
 	SOCKADDR_IN service{ 0 };
 	service.sin_family = AF_INET;						
 	inet_pton(AF_INET, "127.0.0.1", &service.sin_addr); 
@@ -129,6 +142,103 @@ int main()
 		PrintFailedError(listenSocket, "Create accept socket failed with error: ");
 		return 1;
 	}
+
+	
+#if 0
+	// 상대방이 연결을 끊는다면?
+	// 주기적으로 TCP 프로토콜 연결 상태 확인 -> 끊어진 연결 감지
+	rc = setsockopt(acceptSocket, SOL_SOCKET, SO_KEEPALIVE, (char*)&isEnabled, sizeof(isEnabled));
+	if (rc == SOCKET_ERROR)
+	{
+		cout << "setsockopt for SO_KEEPALIVE failed with error : " << WSAGetLastError() << "\n";
+	}
+	else
+	{
+		cout << "SO_KEEPALIVE Value : " << isEnabled << "\n";
+	}
+	
+	// SO_LINGER : 지연하다
+	// 송신 버퍼에 있는 데이터를 보낼 것인지 없엘 것인지
+	//l_onoff == 0 : closesocket()이 바로 리턴, l_onoff == 1 : l_linger 초만큼 대기(default 0)
+	LINGER aLinger;
+	aLinger.l_onoff = 1;	// on
+	aLinger.l_linger = 5;	// 5초 지연
+
+	rc = setsockopt(acceptSocket, SOL_SOCKET, SO_LINGER, (char*)&aLinger, sizeof(aLinger));
+	if (rc == SOCKET_ERROR)
+	{
+		cout << "setsockopt for SO_LINGER failed with error : " << WSAGetLastError() << "\n";
+	}
+	else
+	{
+		cout << "SO_LINGER Value : " << aLinger.l_onoff << "\n";
+	}
+
+	// SO_REUSEADDR : IP주소 및 port 재사용
+	rc = setsockopt(acceptSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&isEnabled, sizeof(isEnabled));
+	if (rc == SOCKET_ERROR)
+	{
+		cout << "setsockopt for SO_REUSEADDR failed with error : " << WSAGetLastError() << "\n";
+	}
+	else
+	{
+		cout << "SO_REUSEADDR Value : " << isEnabled << "\n";
+	}
+
+	// SO_SNDBUF : 송신 버퍼의 크기 제어
+	int Buf_size = 8192;	// 버퍼 크기
+	rc = setsockopt(acceptSocket, SOL_SOCKET, SO_SNDBUF, (char*)&Buf_size, sizeof(Buf_size));
+	if (rc == SOCKET_ERROR)
+	{
+		cout << "getsockopt for SO_SNDBUF failed with error : " << WSAGetLastError() << "\n";
+	}
+	else
+	{
+		cout << "SO_SNDBUF Value : " << Buf_size << "\n";
+	}
+
+	// SO_RCVBUF : 수신 버퍼의 크기 제어
+	rc = setsockopt(acceptSocket, SOL_SOCKET, SO_RCVBUF, (char*)&Buf_size, sizeof(Buf_size));
+	if (rc == SOCKET_ERROR)
+	{
+		cout << "setsockopt for SO_RCVBUF failed with error : " << WSAGetLastError() << "\n";
+	}
+	else
+	{
+		cout << "SO_RCVBUF Value : " << Buf_size << "\n";
+	}
+
+	// SO_UPDATE_CONNECT_CONTEXT : 클라이언트로부터 새로운 연결을 수락(accept)하면, 새 소켓은 몇가지 정보를 가지지 않는다.
+	// listenSocket과 속성과 상태를 업데이트 하기 위해 사용
+	rc = setsockopt(acceptSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char*)&listenSocket, sizeof(listenSocket));
+	if (rc == SOCKET_ERROR)
+	{
+		cout << "setsockopt for SO_UPDATE_ACCEPT_CONTEXT failed with error : " << WSAGetLastError() << "\n";
+	}
+	else
+	{
+		cout << "SO_UPDATE_ACCEPT_CONTEXT Value : " << listenSocket << "\n";
+	}
+#endif // 0
+
+	int sendBufSize, recvBufSize;
+	int optionLen = sizeof(sendBufSize);
+	getsockopt(acceptSocket, SOL_SOCKET, SO_SNDBUF, (char*)&sendBufSize, &optionLen);
+	if (rc == SOCKET_ERROR)
+	{
+		cout << "getsockopt for SO_SNDBUF failed with error : " << WSAGetLastError() << "\n";
+	}
+	
+	cout << "SO_SNDBUF Value : " << sendBufSize << "\n";
+
+	optionLen = sizeof(recvBufSize);
+	getsockopt(acceptSocket, SOL_SOCKET, SO_RCVBUF, (char*)&recvBufSize, &optionLen);
+	if (rc == SOCKET_ERROR)
+	{
+		cout << "getsockopt for SO_RCVBUF failed with error : " << WSAGetLastError() << "\n";
+	}
+
+	cout << "SO_RCVBUF Value : " << recvBufSize << "\n";
 
 	// IOCP 핸들 생성
 	HANDLE iocpHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, NULL);

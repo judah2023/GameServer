@@ -12,6 +12,19 @@ using namespace std;
 #define DATA_BUFSIZE 4096
 #define GS_LOG() {cout << "Running..." << __FUNCTION__ << "(" << __LINE__ << ")\n";}
 
+enum IOCP_TYPE
+{
+	IOCP_NONE,
+	IOCP_CONNECT,
+	IOCP_DISCONNECT
+};
+
+struct Session
+{
+	WSAOVERLAPPED overlapped = {};
+	IOCP_TYPE TYPE = IOCP_NONE;
+};
+
 void PrintFailedError(SOCKET sock, const char* sentence)
 {
 	cout << sentence << " = " << WSAGetLastError() << "\n";
@@ -25,24 +38,31 @@ void ConnectThread(HANDLE iocpHandle)
 	DWORD bytesTransferred = 0;
 	ULONG_PTR key = 0;
 	WSAOVERLAPPED overlapped = {};
+	Session* session = nullptr;
 	int err = 0;
-
-	cout << "[Client]\t Waiting...\n";
-	err = GetQueuedCompletionStatus(iocpHandle, &bytesTransferred, &key, (LPOVERLAPPED*)&overlapped, INFINITE);
-	if (err == true)
-	{
-		printf("[Client]\t Server Connected!\n");
-	}
 
 	while (true)
 	{
-		cout << "\n=====================================================================\n";
+		cout << "[Client]\t Waiting...\n";
+		err = GetQueuedCompletionStatus(iocpHandle, &bytesTransferred, &key, (LPOVERLAPPED*)&session, INFINITE);
+		if (err == true)
+		{
 
-		GS_LOG();
+			switch (session->TYPE)
+			{
+			case IOCP_CONNECT:
+				cout << "[Client]\t Connect Successed!\n";
 
-		this_thread::sleep_for(1s);
+				break;
+			case IOCP_DISCONNECT:
+				cout << "[Client]\t Disconnect Successed!\n";
+				return;
+			default:
+				break;
+			}
+		}
 	}
-
+	
 }
 
 int main()
@@ -84,9 +104,25 @@ int main()
 	DWORD dwBytes;
 	LPFN_CONNECTEX lpfnConnectEX = nullptr;
 	GUID GuidConnectEX = WSAID_CONNECTEX;
-	rc = WSAIoctl(connectSocket, SIO_GET_EXTENSION_FUNCTION_POINTER,
+	rc = WSAIoctl(
+		connectSocket, SIO_GET_EXTENSION_FUNCTION_POINTER,
 		&GuidConnectEX, sizeof(GuidConnectEX),
 		&lpfnConnectEX, sizeof(lpfnConnectEX),
+		&dwBytes, nullptr, nullptr
+	);
+	if (rc == SOCKET_ERROR)
+	{
+		PrintFailedError(connectSocket, "WSAIoctl failed with error : ");
+		return 1;
+	}
+
+	LPFN_DISCONNECTEX lpfnDisconnectEX = nullptr;
+	GUID GuidDisconnect = WSAID_DISCONNECTEX;
+
+	rc = WSAIoctl(
+		connectSocket, SIO_GET_EXTENSION_FUNCTION_POINTER,
+		&GuidDisconnect, sizeof(GuidDisconnect),
+		&lpfnDisconnectEX, sizeof(lpfnDisconnectEX),
 		&dwBytes, nullptr, nullptr
 	);
 	if (rc == SOCKET_ERROR)
@@ -125,10 +161,11 @@ int main()
 	thread t(ConnectThread, iocpHandle);
 
 	DWORD numOfBytes = 0;
-	WSAOVERLAPPED overlapped = {};
+	Session* connectSession = new Session;
+	connectSession->TYPE = IOCP_CONNECT;
 
 	// 비동기 연결 시작
-	rc = lpfnConnectEX(connectSocket, (SOCKADDR*)&service, sizeof(service), nullptr, 0, &numOfBytes, &overlapped);
+	rc = lpfnConnectEX(connectSocket, (SOCKADDR*)&service, sizeof(service), nullptr, 0, &numOfBytes, &connectSession->overlapped);
 	if (rc == false)
 	{
 		if (WSAGetLastError() != ERROR_IO_PENDING)
@@ -138,7 +175,18 @@ int main()
 		}
 	}
 
+	Session* disconnectSession = new Session;
+	disconnectSession->TYPE = IOCP_DISCONNECT;
 
+	rc = lpfnDisconnectEX(connectSocket, &disconnectSession->overlapped, NULL, NULL);
+	if (rc == false)
+	{
+		if (WSAGetLastError() != ERROR_IO_PENDING)
+		{
+			PrintFailedError(connectSocket, "DisconnectEx failed with error : ");
+			return 1;
+		}
+	}
 
 	t.join();
 
