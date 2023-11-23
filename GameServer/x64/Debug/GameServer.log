@@ -1,2 +1,8 @@
 ﻿  GameServer.cpp
-  GameServer.vcxproj -> C:\Users\Administrator\Desktop\NGH\GameServer\x64\Debug\GameServer.exe
+  Listener.cpp
+  Service.cpp
+C:\Users\ngh75\Desktop\Programming\Server\GameServer\GameServer\Listener.cpp(16,6): warning C4101: 'rc': unreferenced local variable
+  Generating Code...
+  (compiling source file '/Listener.cpp')
+  
+  GameServer.vcxproj -> C:\Users\ngh75\Desktop\Programming\Server\GameServer\x64\Debug\GameServer.exe
