@@ -7,3 +7,7 @@ using namespace std;
 #include <WS2tcpip.h>
 #include <thread>  
 #include <mswsock.h> 
+
+
+#define DATA_BUFSIZE 4096
+#define GS_LOG() {cout << "Running..." << __FUNCTION__ << "(" << __LINE__ << ")\n";}

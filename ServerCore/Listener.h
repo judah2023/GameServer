@@ -1,8 +1,4 @@
 #pragma once
-#include "pch.h"
-
-#define DATA_BUFSIZE 4096
-
 class Listener
 {
 

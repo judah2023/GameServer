@@ -32,3 +32,9 @@
 *.app
 
 .vs/
+
+x64/
+
+GameClient/x64/
+GameServer/x64/
+ServerCore/x64/
