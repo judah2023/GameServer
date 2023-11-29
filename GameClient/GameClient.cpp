@@ -1,16 +1,7 @@
-#include <iostream>
+#include "pch.h"
 
-using namespace std;
-
-#pragma comment(lib, "Ws2_32.lib")
-#include <WinSock2.h>
-#include <WS2tcpip.h>
-#include <mswsock.h>
-
-#include <thread>
-
-#define DATA_BUFSIZE 4096
-#define GS_LOG() {cout << "Running..." << __FUNCTION__ << "(" << __LINE__ << ")\n";}
+#include "Service.h"
+#include "Listener.h"
 
 enum IOCP_TYPE
 {
@@ -71,7 +62,7 @@ int main()
 	WSADATA wsaData;
 	int rc;
 	int err = 0;
-
+	
 	wVersionRequested = MAKEWORD(2, 2);
 
 	rc = WSAStartup(wVersionRequested, &wsaData);
@@ -187,6 +178,7 @@ int main()
 			return 1;
 		}
 	}
+
 
 	t.join();
 

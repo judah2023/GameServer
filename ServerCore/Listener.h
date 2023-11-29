@@ -1,22 +1,27 @@
 #pragma once
-class Listener
-{
 
+#include "IOCPObj.h"
+
+class Listener : public IOCPObj
+{
 private:
 	SOCKET socket = INVALID_SOCKET;
-	HANDLE iocpHandle = nullptr;
-	LPFN_ACCEPTEX lpfnAcceptEx = nullptr;
-	GUID GuidAcceptEx = WSAID_ACCEPTEX;
 
 public:
-	HANDLE GetHandle() const { return iocpHandle; }
-
-public:
-	Listener();
+	Listener() = default;
 	~Listener();
 
 public:
-	bool Accept(class Service& service);
+	HANDLE GetHandle() override;
+	virtual void Dispatch(IOCPEvent* iocpEvent, int numOfBytes) override;
+
+public:
+	bool Accept(class Service* service);
 	void CloseSocket();
+
+private:
+	void RegisterAccept(class AcceptEvent* acceptEvent);
+	void ProcessAccept(AcceptEvent* acceptEvent);
+
 };
 

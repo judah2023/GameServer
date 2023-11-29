@@ -1,6 +1,10 @@
 #pragma once
 class SocketHelper
 { 
+
+public:
+	static LPFN_ACCEPTEX lpfnAcceptEx;
+
 	// bool return
 	// true is Success
 public:
@@ -15,6 +19,7 @@ public:
 	// Socket Option
 	static bool SetReuseAddress(SOCKET socket, bool enable);
 	static bool SetLinger(SOCKET socket, u_short onoff, u_short time);
+	static bool SetUpdateAcceptSocket(SOCKET acceptSocket, SOCKET listenSocket);
 
 public:
 	static bool Bind(SOCKET socket, SOCKADDR_IN sockAddr);

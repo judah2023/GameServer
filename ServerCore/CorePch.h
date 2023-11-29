@@ -10,4 +10,4 @@ using namespace std;
 
 
 #define DATA_BUFSIZE 4096
-#define GS_LOG() {cout << "Running..." << __FUNCTION__ << "(" << __LINE__ << ")\n";}
+#define GS_LOG() {cout << "Running...\t" << __FUNCTION__ << "(" << __LINE__ << ")\n";}

@@ -1,38 +1,37 @@
 #include "pch.h"
 #include "Service.h"
 
+#include "Listener.h"
+#include "IOCPCore.h"
+#include "SocketHelper.h"
+
 Service::Service(wstring ip, u_short port) 
 {
-	WSADATA wsaData;
-	int rc;
+	iocpCore = make_shared<IOCPCore>();
 
-	rc = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (rc != ERROR_SUCCESS) // ERROR_SUCCESS = 0L
+	if (!SocketHelper::StartUp())
 	{
-		cout << "WSAStartup failed with error.\n";
+		GS_LOG();
+		printf("Service failed with error : %u\n", WSAGetLastError());
 		return;
 	}
 
-	if (wsaData.wVersion != MAKEWORD(2, 2))
-	{
-		std::cout << "Could not find a usable version of Winsock.dll\n";
-		return;
-	}
-	else
-	{
-		std::cout << "The Winsock 2.2 dll was found okay\n\n";
-	}
-
-	memset(&sockaddr, 0, sizeof(sockaddr));
-	sockaddr.sin_family = AF_INET;
+	memset(&sockAddr, 0, sizeof(sockAddr));
+	sockAddr.sin_family = AF_INET;
 
 	IN_ADDR address;
 	InetPton(AF_INET, ip.c_str(), &address);
-	sockaddr.sin_addr = address;
-	sockaddr.sin_port = htons(port);
+	sockAddr.sin_addr = address;
+	sockAddr.sin_port = htons(port);
 }
 
 Service::~Service()
 {
-	WSACleanup();
+	SocketHelper::CleanUp();
+}
+
+bool Service::Listen()
+{
+	listener = make_shared<Listener>();
+	return listener->Accept(this);
 }

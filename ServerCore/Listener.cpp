@@ -1,33 +1,46 @@
 #include "pch.h"
 
+#include "IOCPCore.h"
+#include "IOCPEvent.h"
 #include "Listener.h"
 #include "Service.h"
+#include "Session.h"
 #include "SocketHelper.h"
-
-Listener::Listener()
-{
-	iocpHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, NULL);
-}
 
 Listener::~Listener()
 {
+	CloseSocket();
 }
 
-bool Listener::Accept(Service& service)
+HANDLE Listener::GetHandle()
 {
-	int rc;
+	return (HANDLE)socket;
+}
 
+void Listener::Dispatch(IOCPEvent* iocpEvent, int numOfBytes)
+{
+	AcceptEvent* acceptEvent = (AcceptEvent*)iocpEvent;
+	ProcessAccept(acceptEvent);
+}
+
+bool Listener::Accept(Service* service)
+{
 	socket = SocketHelper::CreateSocket();
 	if (socket == INVALID_SOCKET)
 		return false;
 
+	ULONG_PTR key = 0;
+	service->GetIOCPCore()->Register(this);
+
+	// setsockopt
 	if (!SocketHelper::SetReuseAddress(socket, true))
 		return false;
 
 	if (!SocketHelper::SetLinger(socket, 0, 0))
 		return false;
 
-	if (!SocketHelper::Bind(socket, service.GetSockAddr()))
+	// Bind
+	if (!SocketHelper::Bind(socket, service->GetSockAddr()))
 		return false;
 
 	if (!SocketHelper::Listen(socket))
@@ -35,38 +48,9 @@ bool Listener::Accept(Service& service)
 
 	cout << "[Server]\t Waiting for client to connect...\n";
 
-	/*if (WSAIoctl(
-		socket, SIO_GET_EXTENSION_FUNCTION_POINTER,
-		&GuidAcceptEx, sizeof(GuidAcceptEx), &lpfnAcceptEx, sizeof(lpfnAcceptEx),
-		&dwBytes, nullptr, nullptr
-	) != SOCKET_ERROR)
-		return false;*/
-
-	if (!SocketHelper::SetIOControl(socket, WSAID_ACCEPTEX, (LPVOID*)&lpfnAcceptEx))
-		return false;
-
-	SOCKET acceptSocket = SocketHelper::CreateSocket();
-	if (acceptSocket == INVALID_SOCKET)
-		return false;
-
-
-	ULONG_PTR key = 0;
-	CreateIoCompletionPort((HANDLE)socket, iocpHandle, key, 0);
-
-	char lpfnOutputBuf[DATA_BUFSIZE] = {};
-	WSAOVERLAPPED overlapped = {};
-
-	DWORD dwBytes = 0;
-	if (!lpfnAcceptEx(
-		socket, acceptSocket, lpfnOutputBuf, DATA_BUFSIZE - ((sizeof(SOCKADDR_IN) + 16) * 2),
-		sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16, &dwBytes, &overlapped
-	))
-	{
-		if (WSAGetLastError() != ERROR_IO_PENDING)
-		{
-			return false;
-		}
-	}
+	AcceptEvent* acceptEvent = new AcceptEvent;
+	acceptEvent->iocpObj = this;
+	RegisterAccept(acceptEvent);
 
     return true;
 }
@@ -74,4 +58,46 @@ bool Listener::Accept(Service& service)
 void Listener::CloseSocket()
 {
 	SocketHelper::CloseSocket(socket);
+}
+
+void Listener::RegisterAccept(AcceptEvent* acceptEvent)
+{
+	Session* session = new Session;
+	acceptEvent->Init();
+	acceptEvent->session = session;
+
+	DWORD dwBytes = 0;
+	if (!SocketHelper::lpfnAcceptEx(
+		socket, session->GetSocket(), session->buffer, 0,
+		sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16, &dwBytes, (LPOVERLAPPED)acceptEvent
+	))
+	{
+		if (WSAGetLastError() != ERROR_IO_PENDING)
+		{
+			RegisterAccept(acceptEvent);
+		}
+	}
+}
+
+void Listener::ProcessAccept(AcceptEvent* acceptEvent)
+{
+	Session* session = acceptEvent->session;
+	if (!SocketHelper::SetUpdateAcceptSocket(session->GetSocket(), socket))
+	{
+		RegisterAccept(acceptEvent);
+		return;
+	}
+
+	SOCKADDR_IN sockAddr;
+	int addressSize = sizeof(sockAddr);
+	if (SOCKET_ERROR == getpeername(session->GetSocket(), (SOCKADDR*)&sockAddr, &addressSize))
+	{
+		RegisterAccept(acceptEvent);
+		return;
+	}
+
+	session->SetSockAddr(sockAddr);
+	session->ProcessConnect();
+
+	RegisterAccept(acceptEvent);
 }

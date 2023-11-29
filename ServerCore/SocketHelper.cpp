@@ -1,10 +1,22 @@
 #include "pch.h"
 #include "SocketHelper.h"
 
+LPFN_ACCEPTEX SocketHelper::lpfnAcceptEx = nullptr;
+
+
 bool SocketHelper::StartUp()
 {
 	WSADATA wsaData;
-	return WSAStartup(MAKEWORD(2, 2), &wsaData) == ERROR_SUCCESS;
+	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != ERROR_SUCCESS)
+	{
+		return false;
+	}
+
+	SOCKET tempSocket = CreateSocket();
+	SetIOControl(tempSocket, WSAID_ACCEPTEX, (LPVOID*)&lpfnAcceptEx);
+	CloseSocket(tempSocket);
+
+	return true;
 }
 
 void SocketHelper::CleanUp()
@@ -38,6 +50,11 @@ bool SocketHelper::SetLinger(SOCKET socket, u_short onoff, u_short time)
 	sockLinger.l_onoff = onoff;
 	sockLinger.l_linger = time;
 	return SetSocketOpt(socket, SOL_SOCKET, SO_LINGER, sockLinger);
+}
+
+bool SocketHelper::SetUpdateAcceptSocket(SOCKET acceptSocket, SOCKET listenSocket)
+{
+	return SetSocketOpt(acceptSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, listenSocket);
 }
 
 bool SocketHelper::Bind(SOCKET socket, SOCKADDR_IN sockAddr)
