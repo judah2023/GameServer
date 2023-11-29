@@ -8,6 +8,12 @@
     <Filter Include="Network">
       <UniqueIdentifier>{0fc13d50-0fe3-4513-99ab-86ca092e2215}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Network\IOCP">
+      <UniqueIdentifier>{41a726d0-f05a-4a7b-a6c9-3ea340eb6cb0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network\Service">
+      <UniqueIdentifier>{0630ed6c-8154-41a5-bfec-b5cb0bc44f51}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -19,23 +25,26 @@
     <ClInclude Include="Listener.h">
       <Filter>Network</Filter>
     </ClInclude>
-    <ClInclude Include="Service.h">
-      <Filter>Network</Filter>
-    </ClInclude>
     <ClInclude Include="SocketHelper.h">
-      <Filter>Network</Filter>
-    </ClInclude>
-    <ClInclude Include="IOCPCore.h">
       <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="Session.h">
       <Filter>Network</Filter>
     </ClInclude>
+    <ClInclude Include="IOCPCore.h">
+      <Filter>Network\IOCP</Filter>
+    </ClInclude>
     <ClInclude Include="IOCPEvent.h">
-      <Filter>Network</Filter>
+      <Filter>Network\IOCP</Filter>
     </ClInclude>
     <ClInclude Include="IOCPObj.h">
-      <Filter>Network</Filter>
+      <Filter>Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="Service.h">
+      <Filter>Network\Service</Filter>
+    </ClInclude>
+    <ClInclude Include="ServerService.h">
+      <Filter>Network\Service</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -45,26 +54,29 @@
     <ClCompile Include="CorePch.cpp">
       <Filter>pch</Filter>
     </ClCompile>
-    <ClCompile Include="Service.cpp">
-      <Filter>Network</Filter>
-    </ClCompile>
     <ClCompile Include="Listener.cpp">
       <Filter>Network</Filter>
     </ClCompile>
     <ClCompile Include="SocketHelper.cpp">
       <Filter>Network</Filter>
     </ClCompile>
-    <ClCompile Include="IOCPCore.cpp">
-      <Filter>Network</Filter>
-    </ClCompile>
     <ClCompile Include="Session.cpp">
       <Filter>Network</Filter>
     </ClCompile>
+    <ClCompile Include="IOCPCore.cpp">
+      <Filter>Network\IOCP</Filter>
+    </ClCompile>
     <ClCompile Include="IOCPEvent.cpp">
-      <Filter>Network</Filter>
+      <Filter>Network\IOCP</Filter>
     </ClCompile>
     <ClCompile Include="IOCPObj.cpp">
-      <Filter>Network</Filter>
+      <Filter>Network\IOCP</Filter>
+    </ClCompile>
+    <ClCompile Include="Service.cpp">
+      <Filter>Network\Service</Filter>
+    </ClCompile>
+    <ClCompile Include="ServerService.cpp">
+      <Filter>Network\Service</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

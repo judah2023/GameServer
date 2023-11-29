@@ -1,20 +1,12 @@
 #include "pch.h"
 #include "Service.h"
 
-#include "Listener.h"
 #include "IOCPCore.h"
 #include "SocketHelper.h"
 
-Service::Service(wstring ip, u_short port) 
+Service::Service(ServiceType type, wstring ip, u_short port) : type(type)
 {
-	iocpCore = make_shared<IOCPCore>();
-
-	if (!SocketHelper::StartUp())
-	{
-		GS_LOG();
-		printf("Service failed with error : %u\n", WSAGetLastError());
-		return;
-	}
+	SocketHelper::StartUp();
 
 	memset(&sockAddr, 0, sizeof(sockAddr));
 	sockAddr.sin_family = AF_INET;
@@ -23,6 +15,8 @@ Service::Service(wstring ip, u_short port)
 	InetPton(AF_INET, ip.c_str(), &address);
 	sockAddr.sin_addr = address;
 	sockAddr.sin_port = htons(port);
+
+	iocpCore = make_shared<IOCPCore>();
 }
 
 Service::~Service()
@@ -30,8 +24,32 @@ Service::~Service()
 	SocketHelper::CleanUp();
 }
 
-bool Service::Listen()
+bool Service::Start()
 {
-	listener = make_shared<Listener>();
-	return listener->Accept(this);
+	return true;
+}
+
+shared_ptr<Session> Service::CreateSession(shared_ptr<Session> session)
+{
+	shared_ptr<Session> session = factory();
+	if (!iocpCore->Register(session))
+	{
+		return nullptr;
+	}
+
+	return session;
+}
+
+void Service::AddSession(shared_ptr<Session> session)
+{
+	unique_lock<shared_mutex> lock(rwLock);
+	sessionCount++;
+	sessions.insert(session);
+}
+
+void Service::RemoveSession(shared_ptr<Session> session)
+{
+	unique_lock<shared_mutex> lock(rwLock);
+	sessions.erase(session);
+	sessionCount--;
 }

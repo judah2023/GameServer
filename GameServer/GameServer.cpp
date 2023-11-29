@@ -1,13 +1,19 @@
 #include "pch.h"
 
-#include "Service.h"
+#include "ServerService.h"
 #include "Listener.h"
 #include "IOCPCore.h"
 
+using namespace std;
+
 int main()
 {
-	shared_ptr<Service> service = make_shared<Service>(L"127.0.0.1", 7777);
-	service->Listen();
+	shared_ptr<ServerService> service = make_shared<ServerService>(L"127.0.0.1", 7777);
+	if (!service->Start())
+	{
+		printf("[Server]\t Service failed to start with errer : %u", WSAGetLastError());
+		return 1;
+	}
 
 	thread t([=]()
 		{
@@ -17,7 +23,6 @@ int main()
 				this_thread::sleep_for(1s);
 			}
 		});
-
 
 	t.join();
 	
