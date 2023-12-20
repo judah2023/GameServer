@@ -3,7 +3,9 @@ class SocketHelper
 { 
 
 public:
-	static LPFN_ACCEPTEX lpfnAcceptEx;
+	static LPFN_CONNECTEX ConnectEx;
+	static LPFN_ACCEPTEX AcceptEx;
+	static LPFN_DISCONNECTEX DisconnectEx;
 
 	// bool return
 	// true is Success
@@ -23,6 +25,7 @@ public:
 
 public:
 	static bool Bind(SOCKET socket, SOCKADDR_IN sockAddr);
+	static bool BindAnyAddress(SOCKET socket, u_short port);
 	static bool Listen(SOCKET socket, int backlog = SOMAXCONN);
 	static void CloseSocket(SOCKET& socket);
 

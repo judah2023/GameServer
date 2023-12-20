@@ -2,7 +2,7 @@
 
 class IOCPEvent;
 
-class IOCPObj
+class IOCPObj : public enable_shared_from_this<IOCPObj>
 {
 
 public:

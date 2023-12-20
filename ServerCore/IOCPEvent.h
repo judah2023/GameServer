@@ -1,8 +1,5 @@
 #pragma once
 
-class IOCPObj;
-class Session;
-
 enum class EventType : u_char
 {
 	CONNECT,
@@ -12,12 +9,16 @@ enum class EventType : u_char
 	SEND
 };
 
+class IOCPObj;
+class Session;
+class SendBuffer;
+
 class IOCPEvent :public OVERLAPPED
 {
 
 public:
 	EventType eventType;
-	IOCPObj* iocpObj;
+	shared_ptr<IOCPObj> iocpObj;
 
 public:
 	IOCPEvent(EventType type);
@@ -27,14 +28,40 @@ public:
 
 };
 
+class ConnectEvent : public IOCPEvent
+{
+public:
+	ConnectEvent() : IOCPEvent(EventType::CONNECT) {}
+
+};
+
 class AcceptEvent : public IOCPEvent
 {
 
 public:
-	Session* session = nullptr;
+	AcceptEvent() : IOCPEvent(EventType::ACCEPT) {}
 
 public:
-	AcceptEvent() : IOCPEvent(EventType::ACCEPT) {}
+	shared_ptr<Session> session = nullptr;
 
 };
 
+class RecvEvent : public IOCPEvent
+{
+public:
+	RecvEvent() : IOCPEvent(EventType::RECV) {}
+};
+
+class SendEvent : public IOCPEvent
+{
+public:
+	SendEvent() : IOCPEvent(EventType::SEND) {}
+public:
+	vector<shared_ptr<SendBuffer>> buffers;
+};
+
+class DisconnectEvent : public IOCPEvent
+{
+public:
+	DisconnectEvent() : IOCPEvent(EventType::DISCONNECT) {}
+};

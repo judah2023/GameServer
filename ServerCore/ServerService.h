@@ -9,10 +9,9 @@ private:
 	shared_ptr<Listener> listener = nullptr;
 
 public:
-	ServerService(wstring ip, u_short port);
+	ServerService(wstring ip, u_short port, SessionFactory factoryFunc);
+	virtual ~ServerService() {}
 
 public:
 	virtual bool Start() override;
-
 };
-

@@ -3,13 +3,13 @@
 
 #include "Listener.h"
 
-ServerService::ServerService(wstring ip, u_short port) 
-	: Service(ServiceType::SERVER, ip, port)
+ServerService::ServerService(wstring ip, u_short port, SessionFactory factoryFunc) 
+	: Service(ServiceType::SERVER, ip, port, factoryFunc)
 {
 }
 
 bool ServerService::Start()
 {
 	listener = make_shared<Listener>();
-	return listener->Accept(this);
+	return listener->Accept(static_pointer_cast<ServerService>(shared_from_this()));
 }

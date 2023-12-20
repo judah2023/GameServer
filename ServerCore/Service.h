@@ -1,51 +1,50 @@
 #pragma once
 #include <functional>
 
-class IOCPCore;
-class Session;
-
 enum class ServiceType : u_char
 {
 	SERVER,
 	CLIENT
 };
 
+class IOCPCore;
+class Session;
+
 using SessionFactory = function<shared_ptr<Session>(void)>;
 
-class Service
+class Service : public enable_shared_from_this<Service>
 {
 
 private:
 	ServiceType type;
 	SOCKADDR_IN sockAddr = {};
-	shared_ptr<IOCPCore> iocpCore;
+	shared_ptr<IOCPCore> iocpCore = nullptr;
 
 protected:
 	shared_mutex rwLock;
-	UINT sessionCount = 0;
 	set<shared_ptr<Session>> sessions;
-	SessionFactory factory;
+	UINT sessionCount = 0;
+	SessionFactory sessionFactory;
 
 public:
-	Service() = delete;
-	Service(ServiceType type, wstring ip, u_short port);
+	Service(ServiceType type, wstring ip, u_short port, SessionFactory factoryFunc);
 	~Service();
-
-public:
-	virtual bool Start();
 
 public:
 	ServiceType GetType() { return type; }
 	SOCKADDR_IN& GetSockAddr() { return sockAddr; }
-	IOCPCore* GetIOCPCore() { return iocpCore.get(); }
+	shared_ptr<IOCPCore> GetIOCPCore() { return iocpCore; }
 	int GetSessionCount() { return sessionCount; }
 
-	void SetFactory(const SessionFactory func) { factory = func; }
+	void SetSessionFactory(const SessionFactory factoryFunc) { sessionFactory = factoryFunc; }
 
 public:
-	shared_ptr<Session> CreateSession(shared_ptr<Session> session);
-	void AddSession(shared_ptr<Session> session);
-	void RemoveSession(shared_ptr<Session> session);
+	shared_ptr<Session> CreateSession();
+	void AddSession(shared_ptr<Session>  session);
+	void RemoveSession(shared_ptr<Session>  session);
+
+public:
+	virtual bool Start() abstract;
 
 };
 

@@ -1,0 +1,9 @@
+syntax = "proto3";
+package Protocol;
+
+message TEST
+{
+  int32 id = 1;
+  int32 hp = 2;
+  int32 mp = 3;
+}

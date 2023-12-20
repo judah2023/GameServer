@@ -2,9 +2,11 @@
 #include "Service.h"
 
 #include "IOCPCore.h"
+#include "Session.h"
 #include "SocketHelper.h"
 
-Service::Service(ServiceType type, wstring ip, u_short port) : type(type)
+Service::Service(ServiceType type, wstring ip, u_short port, SessionFactory factoryFunc) 
+	: type(type), sessionFactory(factoryFunc)
 {
 	SocketHelper::StartUp();
 
@@ -24,14 +26,11 @@ Service::~Service()
 	SocketHelper::CleanUp();
 }
 
-bool Service::Start()
+shared_ptr<Session> Service::CreateSession()
 {
-	return true;
-}
+	shared_ptr<Session> session = sessionFactory();
+	session->SerService(shared_from_this());
 
-shared_ptr<Session> Service::CreateSession(shared_ptr<Session> session)
-{
-	shared_ptr<Session> session = factory();
 	if (!iocpCore->Register(session))
 	{
 		return nullptr;

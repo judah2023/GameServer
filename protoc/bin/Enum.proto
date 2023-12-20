@@ -1,0 +1,11 @@
+syntax = "proto3";
+package Protocol;
+
+enum GenderType
+{
+	NONE = 0;
+	MALE = 1;
+	FEMALE = 2;
+	BOTH = 3;
+	ETC = 4;
+}

@@ -1,11 +1,12 @@
 #pragma once
 
 class IOCPObj;
+class Session;
 
 class IOCPCore
 {
 private:
-	HANDLE iocpHandle;
+	HANDLE iocpHandle = nullptr;
 
 public:
 	IOCPCore();
@@ -14,7 +15,7 @@ public:
 public:
 	HANDLE GetHandle() { return iocpHandle; }
 
-	bool Register(IOCPObj* iocpObj);
+	bool Register(shared_ptr<IOCPObj> iocpObj);
 	bool Dispatch(DWORD time = INFINITE);
 };
 

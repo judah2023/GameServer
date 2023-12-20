@@ -14,6 +14,12 @@
     <Filter Include="Network\Service">
       <UniqueIdentifier>{0630ed6c-8154-41a5-bfec-b5cb0bc44f51}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Network\Buffer">
+      <UniqueIdentifier>{6d0324ea-ddf3-4624-a30b-5b1120077954}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network\Session">
+      <UniqueIdentifier>{cf905a72-1fc0-460c-a3ac-4d2d760824de}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -26,9 +32,6 @@
       <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="SocketHelper.h">
-      <Filter>Network</Filter>
-    </ClInclude>
-    <ClInclude Include="Session.h">
       <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="IOCPCore.h">
@@ -46,6 +49,27 @@
     <ClInclude Include="ServerService.h">
       <Filter>Network\Service</Filter>
     </ClInclude>
+    <ClInclude Include="ClientService.h">
+      <Filter>Network\Service</Filter>
+    </ClInclude>
+    <ClInclude Include="SendBuffer.h">
+      <Filter>Network\Buffer</Filter>
+    </ClInclude>
+    <ClInclude Include="RecvBuffer.h">
+      <Filter>Network\Buffer</Filter>
+    </ClInclude>
+    <ClInclude Include="SendBufferManager.h">
+      <Filter>Network\Buffer</Filter>
+    </ClInclude>
+    <ClInclude Include="SendBufferChunck.h">
+      <Filter>Network\Buffer</Filter>
+    </ClInclude>
+    <ClInclude Include="Session.h">
+      <Filter>Network\Session</Filter>
+    </ClInclude>
+    <ClInclude Include="PacketSession.h">
+      <Filter>Network\Session</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -58,9 +82,6 @@
       <Filter>Network</Filter>
     </ClCompile>
     <ClCompile Include="SocketHelper.cpp">
-      <Filter>Network</Filter>
-    </ClCompile>
-    <ClCompile Include="Session.cpp">
       <Filter>Network</Filter>
     </ClCompile>
     <ClCompile Include="IOCPCore.cpp">
@@ -77,6 +98,27 @@
     </ClCompile>
     <ClCompile Include="ServerService.cpp">
       <Filter>Network\Service</Filter>
+    </ClCompile>
+    <ClCompile Include="ClientService.cpp">
+      <Filter>Network\Service</Filter>
+    </ClCompile>
+    <ClCompile Include="SendBuffer.cpp">
+      <Filter>Network\Buffer</Filter>
+    </ClCompile>
+    <ClCompile Include="RecvBuffer.cpp">
+      <Filter>Network\Buffer</Filter>
+    </ClCompile>
+    <ClCompile Include="SendBufferManager.cpp">
+      <Filter>Network\Buffer</Filter>
+    </ClCompile>
+    <ClCompile Include="SendBufferChunck.cpp">
+      <Filter>Network\Buffer</Filter>
+    </ClCompile>
+    <ClCompile Include="Session.cpp">
+      <Filter>Network\Session</Filter>
+    </ClCompile>
+    <ClCompile Include="PacketSession.cpp">
+      <Filter>Network\Session</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -1,11 +1,12 @@
 #include "pch.h"
+#include "Listener.h"
 
 #include "IOCPCore.h"
 #include "IOCPEvent.h"
-#include "Listener.h"
-#include "Service.h"
+#include "ServerService.h"
 #include "Session.h"
 #include "SocketHelper.h"
+#include "RecvBuffer.h"
 
 Listener::~Listener()
 {
@@ -23,14 +24,17 @@ void Listener::Dispatch(IOCPEvent* iocpEvent, int numOfBytes)
 	ProcessAccept(acceptEvent);
 }
 
-bool Listener::Accept(Service* service)
+bool Listener::Accept(shared_ptr<ServerService> inService)
 {
+	service = inService;
+
 	socket = SocketHelper::CreateSocket();
 	if (socket == INVALID_SOCKET)
 		return false;
 
 	ULONG_PTR key = 0;
-	service->GetIOCPCore()->Register(this);
+	if (service->GetIOCPCore()->Register(shared_from_this()) == false)
+		return false;
 
 	// setsockopt
 	if (!SocketHelper::SetReuseAddress(socket, true))
@@ -40,7 +44,7 @@ bool Listener::Accept(Service* service)
 		return false;
 
 	// Bind
-	if (!SocketHelper::Bind(socket, service->GetSockAddr()))
+	if (!SocketHelper::Bind(socket, inService->GetSockAddr()))
 		return false;
 
 	if (!SocketHelper::Listen(socket))
@@ -49,7 +53,7 @@ bool Listener::Accept(Service* service)
 	cout << "[Server]\t Waiting for client to connect...\n";
 
 	AcceptEvent* acceptEvent = new AcceptEvent;
-	acceptEvent->iocpObj = this;
+	acceptEvent->iocpObj = shared_from_this();
 	RegisterAccept(acceptEvent);
 
     return true;
@@ -62,13 +66,13 @@ void Listener::CloseSocket()
 
 void Listener::RegisterAccept(AcceptEvent* acceptEvent)
 {
-	Session* session = new Session;
+	shared_ptr<Session> session = service->CreateSession();
 	acceptEvent->Init();
 	acceptEvent->session = session;
 
 	DWORD dwBytes = 0;
-	if (!SocketHelper::lpfnAcceptEx(
-		socket, session->GetSocket(), session->buffer, 0,
+	if (!SocketHelper::AcceptEx(
+		socket, session->GetSocket(), session->recvBuffer->WritePos(), 0,
 		sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16, &dwBytes, (LPOVERLAPPED)acceptEvent
 	))
 	{
@@ -81,7 +85,7 @@ void Listener::RegisterAccept(AcceptEvent* acceptEvent)
 
 void Listener::ProcessAccept(AcceptEvent* acceptEvent)
 {
-	Session* session = acceptEvent->session;
+	shared_ptr<Session> session = acceptEvent->session;
 	if (!SocketHelper::SetUpdateAcceptSocket(session->GetSocket(), socket))
 	{
 		RegisterAccept(acceptEvent);

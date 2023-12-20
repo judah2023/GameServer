@@ -1,7 +1,9 @@
 #include "pch.h"
 #include "SocketHelper.h"
 
-LPFN_ACCEPTEX SocketHelper::lpfnAcceptEx = nullptr;
+LPFN_CONNECTEX SocketHelper::ConnectEx = nullptr;
+LPFN_ACCEPTEX SocketHelper::AcceptEx = nullptr;
+LPFN_DISCONNECTEX SocketHelper::DisconnectEx = nullptr;
 
 
 bool SocketHelper::StartUp()
@@ -13,7 +15,9 @@ bool SocketHelper::StartUp()
 	}
 
 	SOCKET tempSocket = CreateSocket();
-	SetIOControl(tempSocket, WSAID_ACCEPTEX, (LPVOID*)&lpfnAcceptEx);
+	SetIOControl(tempSocket, WSAID_CONNECTEX, (LPVOID*)&ConnectEx);
+	SetIOControl(tempSocket, WSAID_ACCEPTEX, (LPVOID*)&AcceptEx);
+	SetIOControl(tempSocket, WSAID_DISCONNECTEX, (LPVOID*)&DisconnectEx);
 	CloseSocket(tempSocket);
 
 	return true;
@@ -59,6 +63,17 @@ bool SocketHelper::SetUpdateAcceptSocket(SOCKET acceptSocket, SOCKET listenSocke
 
 bool SocketHelper::Bind(SOCKET socket, SOCKADDR_IN sockAddr)
 {
+	return bind(socket, (SOCKADDR*)&sockAddr, sizeof(sockAddr)) != SOCKET_ERROR;
+}
+
+bool SocketHelper::BindAnyAddress(SOCKET socket, u_short port)
+{
+	SOCKADDR_IN sockAddr;
+	memset(&sockAddr, 0, sizeof(sockAddr));
+	sockAddr.sin_family = AF_INET;
+	sockAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	sockAddr.sin_port = htons(port);
+
 	return bind(socket, (SOCKADDR*)&sockAddr, sizeof(sockAddr)) != SOCKET_ERROR;
 }
 

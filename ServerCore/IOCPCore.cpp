@@ -15,7 +15,7 @@ IOCPCore::~IOCPCore()
 	CloseHandle(iocpHandle);
 }
 
-bool IOCPCore::Register(IOCPObj* iocpObj)
+bool IOCPCore::Register(shared_ptr<IOCPObj> iocpObj)
 {
 	return CreateIoCompletionPort(iocpObj->GetHandle(), iocpHandle, NULL, NULL);
 }
@@ -28,13 +28,13 @@ bool IOCPCore::Dispatch(DWORD time)
 
 	cout << "\n=====================================================================\n";
 
-	GS_LOG();
+	//GS_LOG();
 
-	printf("[Server]\t Waiting...\n");
+	printf("Waiting...\n");
 	//IOCP에서 완료된 작업을 대기하고 결과를 가져옴
 	if (GetQueuedCompletionStatus(iocpHandle, &bytesTransferred, &key, (LPOVERLAPPED*)&iocpEvent, time))
 	{
-		IOCPObj* iocpObj = iocpEvent->iocpObj;
+		shared_ptr<IOCPObj> iocpObj = iocpEvent->iocpObj;
 		iocpObj->Dispatch(iocpEvent, bytesTransferred);
 	}
 	else
@@ -45,9 +45,13 @@ bool IOCPCore::Dispatch(DWORD time)
 			printf("GetQueuedCompletionStatus failed with Error %d\n", WSAGetLastError());
 			return false;
 		default:
+			shared_ptr<IOCPObj> iocpObj = iocpEvent->iocpObj;
+			iocpObj->Dispatch(iocpEvent, bytesTransferred);
 			break;
 		}
 	}
+
+	// To do
 
 	return true;
 }
